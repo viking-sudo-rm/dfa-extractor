@@ -70,8 +70,12 @@ tokenizer = Tokenizer()
 lang = AbstarGenerator()
 train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(1, 1000)], batch_first=True)
 dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
-train_mask = (train == 0)
-dev_mask = (dev == 0)
+train_mask = (train != 0)
+dev_mask = (dev != 0)
+
+print("Sample input")
+print(train[3, :10])
+print(train_mask[3, :10])
 
 model = LanguageModel(tokenizer.n_tokens, 10, 100)
 if use_gpu:
