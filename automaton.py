@@ -35,6 +35,7 @@ class DFA:
                 if (arcs[0] == s):
                     cur_state = arcs[1]
                     found = True
+                    print(cur_state)
             if (not found):
                 return "FSA rejects"
         if (self.final[cur_state]):
@@ -53,7 +54,6 @@ class DFA:
 
         if (self.final[state1] != self.final[state2]):
             print("Trivially wrong. One state is final while the other is not.")
-            print(state1, state2)
             return 1
 
         # find ingoing of the second state
@@ -68,6 +68,7 @@ class DFA:
                 continue
             self.table[state1].append([arcs[0], arcs[1]])
 
+        print(state1, state2)
         del self.table[state2]
         del self.final[state2]
         return 0
@@ -104,4 +105,5 @@ def equiv(dfa1, dfa2):
 
     name1, name2 = str(dfa1.id) + '.fst', str(dfa2.id) + '.fst'
     res = subprocess.run(["fstequivalent", name1, name2], capture_output=True)
+    print(res)
     return res.returncode

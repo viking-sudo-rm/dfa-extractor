@@ -3,7 +3,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 import argparse
 
-from abstar import AbstarGenerator
+from abstar import AbstarGenerator, AbbastarGenerator
 from utils import sequence_cross_entropy_with_logits, LanguageModel, Tokenizer
 
 
@@ -12,12 +12,18 @@ def parse_args():
     parser.add_argument("--n_epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--stop_threshold", type=int, default=2)
+    parser.add_argument("--lang", type=str, default="abstar")
     return parser.parse_args()
 
 args = parse_args()
 use_gpu = torch.cuda.is_available()
 tokenizer = Tokenizer()
-lang = AbstarGenerator()
+if (args.lang == "abstar"):
+    lang = AbstarGenerator()
+elif (args.lang == "abbastar"):
+    lang = AbbastarGenerator()
+else:
+    raise NotImplementedError("Non implemented language.")
 train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(1, 1000)], batch_first=True)
 dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 train_mask = (train != 0)
@@ -66,8 +72,8 @@ for epoch in range(args.n_epochs):
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
-        print("Best model! Saved models/best.th")
-        torch.save(model.state_dict(), "models/best.th")
+        print("Best model! Saved models/best'--lang'.th")
+        torch.save(model.state_dict(), "models/best" + str(args.lang) + ".th")
 
     if epoch - best_epoch > args.stop_threshold:
         print("Stopped early!")
