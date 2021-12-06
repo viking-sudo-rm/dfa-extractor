@@ -14,6 +14,8 @@ class Tokenizer:
         self.index_to_token = {}
         self.to_index("<pad>")
         self.to_index("<unk>")
+        self.to_index("<bos>")
+        self.to_index("<eos>")
 
     def to_index(self, token, add=True):
         if token not in self.token_to_index:
@@ -26,7 +28,10 @@ class Tokenizer:
         return self.token_to_index[token]
 
     def tokenize(self, sentence, add=True):
-        return [self.to_index(token, add=add) for token in sentence]
+        tokens = [self.to_index("<bos>")]
+        tokens.extend(self.to_index(token, add=add) for token in sentence)
+        tokens.append(self.to_index("<eos>"))
+        return tokens
 
     @property
     def n_tokens(self):

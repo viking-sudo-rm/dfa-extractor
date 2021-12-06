@@ -24,7 +24,7 @@ elif (args.lang == "abbastar"):
     lang = AbbastarGenerator()
 else:
     raise NotImplementedError("Non implemented language.")
-train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(1, 1000)], batch_first=True)
+train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
 dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 train_mask = (train != 0)
 dev_mask = (dev != 0)

@@ -50,11 +50,13 @@ else:
 
 redundant_dfa = build_fsa_from_dict(id=args.lang, dict=lang.generate(1, n))
 
-trained_model = LanguageModel(4, 10, 100)
-trained_model.load_state_dict(torch.load("./models/best.th"))
 tokenizer = Tokenizer()
 input = pad_sequence([torch.tensor(tokenizer.tokenize(seq * n + 'a'))], batch_first=True)
 mask = (input != 0)
+
+trained_model = LanguageModel(tokenizer.n_tokens, 10, 100)
+filename = f"./models/best{args.lang}.th"
+trained_model.load_state_dict(torch.load(filename))
 
 states = trained_model(input, mask)['states']
 
