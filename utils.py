@@ -8,7 +8,7 @@ from typing import Union, List
 import numpy
 
 class Tokenizer:
-    def __init__(self):
+    def __init__(self, bos=True, eos=False):
         self.next_idx = 0
         self.token_to_index = {}
         self.index_to_token = {}
@@ -16,6 +16,10 @@ class Tokenizer:
         self.to_index("<unk>")
         self.to_index("<bos>")
         self.to_index("<eos>")
+
+        # Whether to add <bos>/<eos> tags during tokenization.
+        self.eos = eos
+        self.bos = bos
 
     def to_index(self, token, add=True):
         if token not in self.token_to_index:
@@ -28,9 +32,12 @@ class Tokenizer:
         return self.token_to_index[token]
 
     def tokenize(self, sentence, add=True):
-        tokens = [self.to_index("<bos>")]
+        tokens = []
+        if self.bos:
+            tokens.append(self.to_index("<bos>"))
         tokens.extend(self.to_index(token, add=add) for token in sentence)
-        tokens.append(self.to_index("<eos>"))
+        if self.eos:
+            tokens.append(self.to_index("<eos>"))
         return tokens
 
     @property
