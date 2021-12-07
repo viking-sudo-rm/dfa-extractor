@@ -1,4 +1,6 @@
 models
+*.fst
+*.dot
 *.pyc
 .DS_Store
 __pycache__/
