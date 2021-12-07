@@ -52,9 +52,9 @@ class DFA:
             # already pruned state
             return 1
 
-        if (self.final[state1] != self.final[state2]):
-            print("Trivially wrong. One state is final while the other is not.")
-            return 1
+        # if (self.final[state1] != self.final[state2]):
+        #     print("Trivially wrong. One state is final while the other is not.")
+        #     return 1
 
         # find ingoing of the second state
         for w in self.table.values():
@@ -68,7 +68,6 @@ class DFA:
                 continue
             self.table[state1].append([arcs[0], arcs[1]])
 
-        print(state1, state2)
         del self.table[state2]
         del self.final[state2]
         return 0

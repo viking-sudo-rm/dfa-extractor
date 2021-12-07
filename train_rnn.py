@@ -3,7 +3,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 import argparse
 
-from abstar import AbstarGenerator, AbbastarGenerator
+from languages import *
 from utils import sequence_cross_entropy_with_logits, LanguageModel, Tokenizer
 
 
@@ -12,18 +12,32 @@ def parse_args():
     parser.add_argument("--n_epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--stop_threshold", type=int, default=2)
-    parser.add_argument("--lang", type=str, default="abstar")
+    parser.add_argument("--lang", type=str, default="Tom2")
     return parser.parse_args()
 
 args = parse_args()
 use_gpu = torch.cuda.is_available()
 tokenizer = Tokenizer()
-if (args.lang == "abstar"):
-    lang = AbstarGenerator()
+if (args.lang == "Tom1"):
+    lang = Tomita1()
+elif (args.lang == "Tom2"):
+    lang = Tomita2()
+elif (args.lang == "Tom3"):
+    lang = Tomita3()
+elif (args.lang == "Tom4"):
+    lang = Tomita4()
+elif (args.lang == "Tom5"):
+    lang = Tomita5()
+elif (args.lang == "Tom6"):
+    lang = Tomita6()
+elif (args.lang == "Tom7"):
+    lang = Tomita7()
 elif (args.lang == "abbastar"):
     lang = AbbastarGenerator()
 else:
     raise NotImplementedError("Non implemented language.")
+
+# increase dataset for Tomita5
 train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
 dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 train_mask = (train != 0)
