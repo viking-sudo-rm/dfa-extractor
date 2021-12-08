@@ -15,14 +15,14 @@ class Tomita2:
 class Tomita3:
 
     """An odd number of a's must be followed be an even number of b's.
-    
+
     Choose tokens randomly, except at the last index.
     """
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield self.sample(n)
-    
+
     def sample(self, n):
         """Running through a DFA."""
         state = "even_a"
@@ -83,7 +83,7 @@ class Tomita4:
             state = 0
             tokens = []
             for _ in range(n):
-                token = "b" if state == 2 else random.choice(["a", "b"])                    
+                token = "b" if state == 2 else random.choice(["a", "b"])
                 tokens.append(token)
                 if token == "b":
                     state = 0
@@ -102,7 +102,7 @@ class Tomita5:
             if n % 2 == 0:
                 yield self.sample(n)
                 yield self.sample(n)
-        
+
 
     def sample(self, n):
         """Where n must be divisible by 2."""
@@ -118,7 +118,7 @@ class Tomita5:
 class Tomita6:
 
     """The number of a's and b's is the same mod 3.
-    
+
     Can do this the dumb way since it should be relatively fast."""
 
     # ugly, replace with regex
@@ -130,7 +130,8 @@ class Tomita6:
             else:
                 count_a += 1
         dif = count_b - count_a
-        return (dif % 3 == 0 and dif >= 0)
+        # return (dif % 3 == 0 and dif >= 0)
+        return (dif % 3 == 0)
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):

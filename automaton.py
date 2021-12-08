@@ -1,6 +1,6 @@
 import subprocess
 
-class DFA:
+class Dfa:
     """
     A basic class that represents a deterministic finite automaton.
     """
@@ -35,13 +35,27 @@ class DFA:
                 if (arcs[0] == s):
                     cur_state = arcs[1]
                     found = True
-                    print(cur_state)
             if (not found):
                 return "FSA rejects"
         if (self.final[cur_state]):
             return "FSA accepts"
         else:
             return "FSA rejects"
+
+    def return_states(self, string):
+        states = [0] * (len(string) + 1)
+        cur_state = self.init_state
+        for i, s in enumerate(string):
+            for arcs in self.table[cur_state]:
+                if (arcs[0] == s):
+                    states[i] = cur_state
+                    cur_state = arcs[1]
+
+
+        if (cur_state != self.init_state):
+            states[i+1] = cur_state
+        return states
+
 
     def merge_states(self, state1, state2):
         """
@@ -53,7 +67,7 @@ class DFA:
             return 1
 
         # if (self.final[state1] != self.final[state2]):
-        #     print("Trivially wrong. One state is final while the other is not.")
+        #     # print("Trivially wrong. One state is final while the other is not.")
         #     return 1
 
         # find ingoing of the second state
@@ -68,6 +82,7 @@ class DFA:
                 continue
             self.table[state1].append([arcs[0], arcs[1]])
 
+        # self.final[state1] = self.final[state2] or self.final[state1] # arbitrary (does it makes sense?)
         del self.table[state2]
         del self.final[state2]
         return 0
@@ -96,6 +111,13 @@ class DFA:
         subprocess.run(["dot", "-Tpdf", str(self.id) + '.dot'], stdout=out)
         out.close()
 
+    def minimize(self):
+        """
+        Minimize current dfa (the .fst file, not the dfa that is represented from this class)
+        (using openfst's fstminimize)
+        """
+        res = subprocess.run(["fstminimize", str(self.id) + '.fst', str(self.id) + '.fst'], capture_output=True)
+
 def equiv(dfa1, dfa2):
     """
     Determines whether two DFAs are equivalent
@@ -104,5 +126,5 @@ def equiv(dfa1, dfa2):
 
     name1, name2 = str(dfa1.id) + '.fst', str(dfa2.id) + '.fst'
     res = subprocess.run(["fstequivalent", name1, name2], capture_output=True)
-    print(res)
+    # print(res)
     return res.returncode
