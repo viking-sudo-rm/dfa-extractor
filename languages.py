@@ -121,24 +121,55 @@ class Tomita6:
 
     Can do this the dumb way since it should be relatively fast."""
 
-    # ugly, replace with regex
-    def valid(self, str):
-        count_a , count_b = 0, 0
-        for c in str:
-            if (c == 'b'):
-                count_b += 1
+    def sample(self, n):
+        tokens = []
+        diff = 0  # #(a) - #(b)
+        for i in range(n):
+            if i == n - 2:
+                if diff == 1:
+                    token = "a"
+                elif diff == 2:
+                    token = "b"
+            elif i == n - 1:
+                if diff == 1:
+                    token = "b"
+                elif diff == 2:
+                    token = "a"
+                else:
+                    raise NotImplementedError
             else:
-                count_a += 1
-        dif = count_b - count_a
-        # return (dif % 3 == 0 and dif >= 0)
-        return (dif % 3 == 0)
-
+                token = random.choice(["a", "b"])
+            
+            if token == "a":
+                diff = (diff + 1) % 3
+            else:
+                diff = (diff - 1) % 3
+            tokens.append(token)
+        
+        return "".join(tokens)
+    
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
-            cand = ''.join(random.choices("ab", k=n))
-            while (not (self.valid(cand))): # one may use instead the := operator
-                cand = ''.join(random.choices("ab", k=n))
-            yield cand
+            yield self.sample(n)
+            
+    # # ugly, replace with regex
+    # def valid(self, str):
+    #     count_a , count_b = 0, 0
+    #     for c in str:
+    #         if (c == 'b'):
+    #             count_b += 1
+    #         else:
+    #             count_a += 1
+    #     dif = count_b - count_a
+    #     # return (dif % 3 == 0 and dif >= 0)
+    #     return (dif % 3 == 0)
+
+    # def generate(self, min_n, max_n):
+    #     for n in range(min_n, max_n):
+    #         cand = ''.join(random.choices("ab", k=n))
+    #         while (not (self.valid(cand))): # one may use instead the := operator
+    #             cand = ''.join(random.choices("ab", k=n))
+    #         yield cand
 
 class Tomita7:
 
