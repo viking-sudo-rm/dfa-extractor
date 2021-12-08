@@ -6,8 +6,9 @@ from languages import *
 class TestLanguages(TestCase):
 
     def test_tomita3(self):
+        random.seed(2)
         tomita3 = Tomita3()
-        words = list(tomita3.generate(0, 10))
+        words = list(tomita3.generate(0, 30))
         assert all(tomita3.valid(w) for w in words)
 
     def test_tomita4(self):
@@ -29,3 +30,10 @@ class TestLanguages(TestCase):
         assert len(words) == 10
         assert all(w.count("a") % 2 == 0 for w in words)
         assert all(w.count("b") % 2 == 0 for w in words)
+
+    def test_tomita6(self):
+        tomita6 = Tomita6()
+        words = list(tomita6.generate(3, 15))
+        a_counts = [w.count("a") % 3 for w in words]
+        b_counts = [w.count("b") % 3 for w in words]
+        self.assertEqual(a_counts, b_counts)
