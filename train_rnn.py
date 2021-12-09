@@ -94,7 +94,7 @@ for epoch in range(args.n_epochs):
             dev_labels = dev_labels.cuda()
             dev_mask = dev_mask.cuda()
         dev_output_dict = model(dev_tokens, dev_labels, dev_mask)
-        accuracy = dev_output_dict["accuracy"]
+        acc = dev_output_dict["accuracy"]
         print("Dev acc:", acc.item())
 
     if acc > best_acc:
