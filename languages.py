@@ -128,20 +128,20 @@ class Tomita6:
         tokens = []
         diff = 0  # #(a) - #(b)
         for i in range(n):
-            if i == n - 3:
+            # if i == n - 3:
+            #     if diff == 1:
+            #         token = "a"
+            #     elif diff == 2:
+            #         token = "b"
+            #     else:
+            #         token = random.choice(["a", "b"])
+            if i == n - 2:
                 if diff == 1:
                     token = "a"
                 elif diff == 2:
                     token = "b"
                 else:
                     token = random.choice(["a", "b"])
-            elif i == n - 2:
-                if diff == 1:
-                    token = "a"
-                elif diff == 2:
-                    token = "b"
-                else:
-                    raise NotImplementedError
             elif i == n - 1:
                 if diff == 1:
                     token = "b"
@@ -161,12 +161,9 @@ class Tomita6:
         return "".join(tokens)
     
     def generate(self, min_n, max_n):
-        assert min_n >= 3
         for n in range(min_n, max_n):
-            # if not n % 3 == 0:
-            #     continue
-            # yield self.sample(n)
-            # yield self.sample(n)
+            if n == 1:
+                continue  # Not possible.
             yield self.sample(n)
             
     # # ugly, replace with regex

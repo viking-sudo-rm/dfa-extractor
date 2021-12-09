@@ -33,7 +33,7 @@ class TestLanguages(TestCase):
 
     def test_tomita6(self):
         tomita6 = Tomita6()
-        words = list(tomita6.generate(3, 15))
+        words = list(tomita6.generate(0, 10))
         a_counts = [w.count("a") % 3 for w in words]
         b_counts = [w.count("b") % 3 for w in words]
         self.assertEqual(a_counts, b_counts)
