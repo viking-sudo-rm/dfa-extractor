@@ -2,15 +2,45 @@ import random
 
 class Tomita1:
 
+    """The language a^*."""
+
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield "a" * n
+    
+    def trace_acceptance(self, string):
+        state = 1
+        states = []
+        for token in string:
+            states.append(state)
+            if token == "b":
+                state = 0
+        states.append(state)
+        return states
+
 
 class Tomita2:
+
+    """The language (ab)^*."""
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield "ab" * n
+    
+    def trace_acceptance(self, string):
+        state = "b"
+        states = []
+        for token in string:
+            states.append(state)
+            if state == "b" and token == "a":
+                state = "a"
+            elif state == "a" and token == "b":
+                state = "b"
+            else:
+                state = "!"
+        states.append(state)
+        return [int(s == "b") for s in states]
+
 
 class Tomita3:
 
@@ -69,6 +99,13 @@ class Tomita3:
                 count_b += 1
         return not (count_b % 2 == 1 and count_a % 2 == 1)
 
+    def trace_acceptance(self, string):
+        status = []
+        for idx in range(len(string) + 1):
+            is_valid = self.valid(string[:idx])
+            status.append(int(is_valid))
+        return status
+
     # def generate(self, min_n, max_n):
     #     for n in range(min_n, max_n):
     #         cand = ''.join(random.choices("ab", k=n))
@@ -93,7 +130,23 @@ class Tomita4:
                 else:
                     state += 1
             yield "".join(tokens)
-
+    
+    def trace_acceptance(self, string):
+        state = 0
+        states = []
+        for token in string:
+            states.append(state)
+            if state == -1:
+                continue
+    
+            if token == "b":
+                state = 0
+            elif token == "a" and state == 2:
+                state = -1
+            else:
+                state += 1
+        states.append(state)
+        return [int(s != -1) for s in states]
 
 
 class Tomita5:
@@ -117,6 +170,24 @@ class Tomita5:
         tokens.extend("b" for _ in range(2 * (k2)))
         random.shuffle(tokens)
         return "".join(tokens)
+    
+    def trace_acceptance(self, string):
+        statuses = []
+        even_a = True
+        even_b = True
+        for token in string:
+            status = int(even_a and even_b)
+            statuses.append(status)
+            
+            if token == "a":
+                even_a = not even_a
+            else:
+                even_b = not even_b
+        
+        status = int(even_a and even_b)
+        statuses.append(status)
+        return statuses
+
 
 class Tomita6:
 
@@ -166,17 +237,23 @@ class Tomita6:
                 continue  # Not possible.
             yield self.sample(n)
             
-    # # ugly, replace with regex
-    # def valid(self, str):
-    #     count_a , count_b = 0, 0
-    #     for c in str:
-    #         if (c == 'b'):
-    #             count_b += 1
-    #         else:
-    #             count_a += 1
-    #     dif = count_b - count_a
-    #     # return (dif % 3 == 0 and dif >= 0)
-    #     return (dif % 3 == 0)
+    def trace_acceptance(self, string):
+        status = []
+        for idx in range(len(string) + 1):
+            is_valid = self.valid(string[:idx])
+            status.append(int(is_valid))
+        return status
+
+    def valid(self, str):
+        count_a , count_b = 0, 0
+        for c in str:
+            if (c == 'b'):
+                count_b += 1
+            else:
+                count_a += 1
+        dif = count_b - count_a
+        # return (dif % 3 == 0 and dif >= 0)
+        return (dif % 3 == 0)
 
     # def generate(self, min_n, max_n):
     #     for n in range(min_n, max_n):
@@ -184,6 +261,7 @@ class Tomita6:
     #         while (not (self.valid(cand))): # one may use instead the := operator
     #             cand = ''.join(random.choices("ab", k=n))
     #         yield cand
+
 
 class Tomita7:
 
@@ -198,6 +276,22 @@ class Tomita7:
             for i in range(4):
                 final += generator[i] * sub[i]
             yield final
+    
+    def trace_acceptance(self, string):
+        states = []
+        state = "b1"
+        for token in string:
+            states.append(state)
+            if state == "b1" and token == "a":
+                state = "a1"
+            elif state == "a1" and token == "b":
+                state = "b2"
+            elif state == "b2" and token == "a":
+                state = "a2"
+            elif state == "a2" and token == "b":
+                state = "!"
+        states.append(state)
+        return [int(s != "!") for s in states]
 
 class AbbastarGenerator:
 
