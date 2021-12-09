@@ -31,13 +31,17 @@ def build_fsa_from_dict(id, dict):
     return my_dfa
 
 def cosine_merging(dfa, states, threshold):
-    cos = torch.nn.CosineSimilarity(dim=0)
+    cos = torch.nn.CosineSimilarity(dim=-1)
     total, pruned = 0, 0
+    # print(states.shape)
+    # print((states @ states.transpose(0, 1)).shape)
+    # x = torch.randn(32, 100, 25)
+    sim = cos(states[None, :, :], states[:, None, :])
     for i in range(states.shape[0]):
         for j in range(i):
             if (i == j):
                 continue
-            if (cos(states[i], states[j]) > threshold):
+            if (sim[i, j] > threshold):
                 total += 1
                 # print("The above gets checked")
                 res = dfa.merge_states(i, j)
@@ -69,7 +73,7 @@ else:
 
 train_acc, dev_acc = {}, {}
 lengths = range(args.lower_length, args.upper_length)
-for seed in range(1):
+for seed in range(3):
     random.seed(seed)
     train_acc[seed], dev_acc[seed] = [], []
     for n in lengths:
@@ -150,5 +154,5 @@ ax.set_ylabel("Accuracy")
 plt.title(args.lang + ', threshold =' + str(args.sim_threshold))
 ax.legend()
 plotname = f"./images/{args.lang + str(args.sim_threshold)}_withoutselflo.pdf"
-plt.savefig(plotname)
+# plt.savefig(plotname)
 plt.show()
