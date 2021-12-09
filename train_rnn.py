@@ -4,7 +4,8 @@ from tqdm import trange
 import argparse
 
 from languages import *
-from utils import sequence_cross_entropy_with_logits, LanguageModel, Tokenizer
+from utils import sequence_cross_entropy_with_logits, Tokenizer
+from models import Tagger
 
 
 def parse_args():
@@ -14,6 +15,15 @@ def parse_args():
     parser.add_argument("--stop_threshold", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom2")
     return parser.parse_args()
+
+
+def get_data(lang, min_n, max_n):
+    sents = list(lang.generate(min_n, max_n))
+    token_ids = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in sents], batch_first=True)
+    labels = pad_sequence([torch.tensor(lang.trace_acceptance(sent)) for sent in sents], batch_first=True)
+    mask = (token_ids != 0)
+    assert token_ids.shape == labels.shape
+    return token_ids, labels, mask
 
 args = parse_args()
 use_gpu = torch.cuda.is_available()
@@ -38,17 +48,18 @@ else:
     raise NotImplementedError("Non implemented language.")
 
 # increase dataset for Tomita5
-train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
-dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
-train_mask = (train != 0)
-dev_mask = (dev != 0)
+train_tokens, train_labels, train_mask = get_data(lang, 0, 1000)
+dev_tokens, dev_labels, dev_mask = get_data(lang, 1001, 1100)
+# train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
+# dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 
 print("Sample input")
-print(train[3, :10])
-print(train_mask[3, :10])
-print(tokenizer.n_tokens)
+print("tokens", train_tokens[3, :10])
+print("labels", train_labels[3, :10])
+print("mask  ", train_mask[3, :10].int())
+print("ntoken", tokenizer.n_tokens)
 
-model = LanguageModel(tokenizer.n_tokens, 10, 100)
+model = Tagger(tokenizer.n_tokens, 10, 100)
 if use_gpu:
     model.cuda()
 optim = torch.optim.AdamW(model.parameters())
@@ -58,29 +69,32 @@ best_epoch = -1
 
 for epoch in range(args.n_epochs):
     print(f"Starting epoch {epoch}...")
-    perm = torch.randperm(len(train))
-    train = train[perm, :]
+    perm = torch.randperm(len(train_tokens))
+    train_tokens = train_tokens[perm, :]
+    train_labels = train_labels[perm, :]
+    train_mask = train_mask[perm, :]
 
-    for batch_idx in trange(0, len(train) - args.batch_size, args.batch_size):
+    for batch_idx in trange(0, len(train_tokens) - args.batch_size, args.batch_size):
         optim.zero_grad()
-        train_batch = train[batch_idx:batch_idx + args.batch_size]
-        train_mask_batch = train_mask[batch_idx:batch_idx + args.batch_size]
+        batch_tokens = train_tokens[batch_idx:batch_idx + args.batch_size]
+        batch_labels = train_labels[batch_idx:batch_idx + args.batch_size]
+        batch_mask = train_mask[batch_idx:batch_idx + args.batch_size]
         if use_gpu:
-            train_batch = train_batch.cuda()
-            train_mask_batch = train_mask_batch.cuda()
-        output_dict = model(train_batch, train_mask_batch)
+            batch_tokens = batch_tokens.cuda()
+            batch_labels = batch_labels.cuda()
+            batch_mask = batch_mask.cuda()
+        output_dict = model(batch_tokens, batch_labels, batch_mask)
         loss = output_dict["loss"]
         loss.backward()
         optim.step()
 
     with torch.no_grad():
         if use_gpu:
-            dev = dev.cuda()
+            dev_tokens = dev_tokens.cuda()
+            dev_labels = dev_labels.cuda()
             dev_mask = dev_mask.cuda()
-        dev_output_dict = model(dev, dev_mask)
-        predictions = dev_output_dict["predictions"]
-        shift_mask = dev_mask[:, :-1]
-        acc = ((predictions == dev[:, 1:]) * shift_mask).sum() / shift_mask.sum()
+        dev_output_dict = model(dev_tokens, dev_labels, dev_mask)
+        accuracy = dev_output_dict["accuracy"]
         print("Dev acc:", acc.item())
 
     if acc > best_acc:

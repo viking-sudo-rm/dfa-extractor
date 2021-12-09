@@ -34,12 +34,15 @@ class Tagger(torch.nn.Module):
         self.criterion = torch.nn.CrossEntropyLoss()
     
     def forward(self, token_ids, labels, mask):
-        embeddings = self.embed(token_ids[:, :-1])
+        embeddings = self.embed(token_ids)
         states, _ = self.rnn(embeddings)
         logits = self.output(states)
         loss = loss = sequence_cross_entropy_with_logits(logits, labels, mask)
+        predictions = logits.argmax(dim=-1)
+        acc = ((predictions == labels) * mask).sum().float() / mask.sum()
         return {
             "states": states,
-            "predictions": logits.argmax(dim=-1),
+            "predictions": predictions,
+            "accuracy": acc,
             "loss": loss,
         }
