@@ -23,7 +23,7 @@ class Dfa:
         for e in arcs:
             self.table[e[0]].append([e[1], e[2]]) # transition symbol and then output state
 
-    def score(self, string):
+    def accept(self, string):
         """
         Determines whether the automaton accepts or not a string.
         """
@@ -36,11 +36,12 @@ class Dfa:
                     cur_state = arcs[1]
                     found = True
             if (not found):
-                return "FSA rejects"
-        if (self.final[cur_state]):
-            return "FSA accepts"
-        else:
-            return "FSA rejects"
+                return False
+        return self.final[cur_state]
+        # if (self.final[cur_state]):
+        #     return "FSA accepts"
+        # else:
+        #     return "FSA rejects"
 
     def return_states(self, string):
         states = [0] * (len(string) + 1)
@@ -80,6 +81,8 @@ class Dfa:
         for arcs in self.table[state2]:
             if (any([arcs[0] == x[0] for x in self.table[state1]])): # if there is a conflict, continue (we only keep state1's transition)
                 continue
+            # if (arcs[1] == state1): # we don't want to create self loops or do we?
+            #     continue
             self.table[state1].append([arcs[0], arcs[1]])
 
         # self.final[state1] = self.final[state2] or self.final[state1] # arbitrary (does it makes sense?)
@@ -116,7 +119,9 @@ class Dfa:
         Minimize current dfa (the .fst file, not the dfa that is represented from this class)
         (using openfst's fstminimize)
         """
+        print(str)
         res = subprocess.run(["fstminimize", str(self.id) + '.fst', str(self.id) + '.fst'], capture_output=True)
+        print(res)
 
 def equiv(dfa1, dfa2):
     """
