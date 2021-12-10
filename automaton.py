@@ -86,6 +86,8 @@ class Dfa:
             self.table[state1].append([arcs[0], arcs[1]])
 
         # self.final[state1] = self.final[state2] or self.final[state1] # arbitrary (does it makes sense?)
+        if (state2 == self.init_state):
+            self.init_state = state1
         del self.table[state2]
         del self.final[state2]
         return 0

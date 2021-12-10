@@ -1,7 +1,6 @@
 import torch
 from utils import sequence_cross_entropy_with_logits
 
-
 class LanguageModel(torch.nn.Module):
     def __init__(self, n_tokens, embed_dim, rnn_dim):
         super().__init__()
@@ -24,7 +23,6 @@ class LanguageModel(torch.nn.Module):
             "loss": loss,
         }
 
-
 class Tagger(torch.nn.Module):
     def __init__(self, n_tokens, embed_dim, rnn_dim, n_labels=2):
         super().__init__()
@@ -32,7 +30,7 @@ class Tagger(torch.nn.Module):
         self.rnn = torch.nn.RNN(embed_dim, rnn_dim, batch_first=True)
         self.output = torch.nn.Linear(rnn_dim, n_labels)
         self.criterion = torch.nn.CrossEntropyLoss()
-    
+
     def forward(self, token_ids, labels, mask):
         embeddings = self.embed(token_ids)
         states, _ = self.rnn(embeddings)

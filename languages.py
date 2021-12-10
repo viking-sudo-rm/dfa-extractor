@@ -7,7 +7,7 @@ class Tomita1:
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield "a" * n
-    
+
     def trace_acceptance(self, string):
         state = 1
         states = []
@@ -26,7 +26,7 @@ class Tomita2:
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield "ab" * n
-    
+
     def trace_acceptance(self, string):
         state = "b"
         states = []
@@ -130,7 +130,7 @@ class Tomita4:
                 else:
                     state += 1
             yield "".join(tokens)
-    
+
     def trace_acceptance(self, string):
         state = 0
         states = []
@@ -138,7 +138,7 @@ class Tomita4:
             states.append(state)
             if state == -1:
                 continue
-    
+
             if token == "b":
                 state = 0
             elif token == "a" and state == 2:
@@ -170,7 +170,7 @@ class Tomita5:
         tokens.extend("b" for _ in range(2 * (k2)))
         random.shuffle(tokens)
         return "".join(tokens)
-    
+
     def trace_acceptance(self, string):
         statuses = []
         even_a = True
@@ -178,12 +178,12 @@ class Tomita5:
         for token in string:
             status = int(even_a and even_b)
             statuses.append(status)
-            
+
             if token == "a":
                 even_a = not even_a
             else:
                 even_b = not even_b
-        
+
         status = int(even_a and even_b)
         statuses.append(status)
         return statuses
@@ -222,21 +222,21 @@ class Tomita6:
                     raise NotImplementedError
             else:
                 token = random.choice(["a", "b"])
-            
+
             if token == "a":
                 diff = (diff + 1) % 3
             else:
                 diff = (diff - 1) % 3
             tokens.append(token)
-        
+
         return "".join(tokens)
-    
+
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             if n == 1:
                 continue  # Not possible.
             yield self.sample(n)
-            
+
     def trace_acceptance(self, string):
         status = []
         for idx in range(len(string) + 1):
@@ -276,7 +276,7 @@ class Tomita7:
             for i in range(4):
                 final += generator[i] * sub[i]
             yield final
-    
+
     def trace_acceptance(self, string):
         states = []
         state = "b1"
@@ -298,16 +298,3 @@ class AbbastarGenerator:
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
             yield "abba" * n
-
-# class EvenaGenerator:
-#
-#     # reg expression is (b + ab^*ab^*)^*
-#     def generate(self, min_n, max_n):
-#         for n in range(min_n, max_n):
-#             p1 = random.random()
-#             if (p1 < 0.5):
-#                 yield "b" * n
-#             else:
-#                 k = random.randint(1, n // 4) # outer repetitions
-#                 count_of_bs = n - 2*k
-#                 count1 = random.uniform

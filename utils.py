@@ -4,8 +4,17 @@ https://github.com/allenai/allennlp/blob/master/allennlp/nn/util.py#L628-L765
 """
 
 import torch
+from torch.nn.utils.rnn import pad_sequence
 from typing import Union, List
 import numpy
+
+def get_data(lang, tokenizer, min_n, max_n):
+    sents = list(lang.generate(min_n, max_n))
+    token_ids = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in sents], batch_first=True)
+    labels = pad_sequence([torch.tensor(lang.trace_acceptance(sent)) for sent in sents], batch_first=True)
+    mask = (token_ids != 0)
+    assert token_ids.shape == labels.shape
+    return token_ids, labels, mask, sents
 
 class Tokenizer:
     def __init__(self, bos=True, eos=False):

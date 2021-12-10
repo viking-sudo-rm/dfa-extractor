@@ -37,27 +37,19 @@ class Trie(object):
 
         # Loop through each character in the word
         # Check if there is no child containing the character, create a new child for the current node
-        # prefix = ''
-        # known_path = False
         for i, char in enumerate(word):
             if char in node.children:
                 known_path = True
                 node = node.children[char]
-                # prefix += char
             else:
                 # If a character is not found,
                 # create a new node in the trie
-
-                # if (known_path and not node.is_final):
-                #     self.strings.append(prefix)
-                # known_path = False
                 self.count += 1
                 new_node = TrieNode(self.count, char)
                 node.children[char] = new_node
                 node = new_node
 
         # Mark the end of a word
-        # self.strings.append(word)
         node.is_final = True
 
         # Increment the counter to indicate that we see this word once more

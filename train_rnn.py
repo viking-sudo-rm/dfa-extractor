@@ -1,10 +1,9 @@
 import torch
-from torch.nn.utils.rnn import pad_sequence
 from tqdm import trange
 import argparse
 
 from languages import *
-from utils import sequence_cross_entropy_with_logits, Tokenizer
+from utils import sequence_cross_entropy_with_logits, Tokenizer, get_data
 from models import Tagger
 
 
@@ -15,15 +14,6 @@ def parse_args():
     parser.add_argument("--stop_threshold", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom2")
     return parser.parse_args()
-
-
-def get_data(lang, min_n, max_n):
-    sents = list(lang.generate(min_n, max_n))
-    token_ids = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in sents], batch_first=True)
-    labels = pad_sequence([torch.tensor(lang.trace_acceptance(sent)) for sent in sents], batch_first=True)
-    mask = (token_ids != 0)
-    assert token_ids.shape == labels.shape
-    return token_ids, labels, mask
 
 args = parse_args()
 use_gpu = torch.cuda.is_available()
@@ -47,9 +37,9 @@ elif (args.lang == "abbastar"):
 else:
     raise NotImplementedError("Non implemented language.")
 
-# increase dataset for Tomita5
-train_tokens, train_labels, train_mask = get_data(lang, 0, 1000)
-dev_tokens, dev_labels, dev_mask = get_data(lang, 1001, 1100)
+
+train_tokens, train_labels, train_mask, train_sents = get_data(lang, tokenizer, 0, 1000)
+dev_tokens, dev_labels, dev_mask, dev_sents = get_data(lang, tokenizer, 1001, 1100)
 # train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
 # dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 
