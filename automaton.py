@@ -23,6 +23,21 @@ class Dfa:
         for e in arcs:
             self.table[e[0]].append([e[1], e[2]]) # transition symbol and then output state
 
+    def add_junk(self, alphabet):
+        first_time = True
+        # force copy
+        nodes = list(self.table.keys())
+        arcs = list(self.table.values())
+        for state, transitions in zip(nodes, arcs):
+            for char in alphabet:
+                if (char not in [e[0] for e in transitions]):
+                    if (first_time):
+                        first_time = False
+                        n = max([k for k in self.table.keys()])
+                        self.final[n+1] = False
+                        self.table[n+1] = [[char, n+1] for char in alphabet]
+                    self.table[state].append([char, n+1])
+
     def accept(self, string):
         """
         Determines whether the automaton accepts or not a string.
@@ -102,6 +117,7 @@ class Dfa:
             for v, w in self.table.items():
                 for arc in w:
                     f.write(str(v) + ' ' + str(arc[1]) + ' ' + str(arc[0]) + '\n')
+                    # f.write(str(v) + ' ' + str(arc[1]) + ' ' + str(arc[0]) + ' ' + '<eps>' + '\n')
             for v, is_final in self.final.items():
                 if (is_final):
                     f.write(str(v) + '\n')
@@ -121,9 +137,8 @@ class Dfa:
         Minimize current dfa (the .fst file, not the dfa that is represented from this class)
         (using openfst's fstminimize)
         """
-        print(str)
+        # print(str)
         res = subprocess.run(["fstminimize", str(self.id) + '.fst', str(self.id) + '.fst'], capture_output=True)
-        print(res)
 
 def equiv(dfa1, dfa2):
     """

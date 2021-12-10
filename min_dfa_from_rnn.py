@@ -23,7 +23,7 @@ def plot_creation(train_acc, dev_acc, lengths, lang, threshold):
     plt.plot(lengths, mean_dev_acc, linestyle='-', marker='.', label='dev acc')
     ax.fill_between(lengths, mean_train_acc - std_train_acc, mean_train_acc + std_train_acc, alpha = 0.3)
     plt.fill_between(lengths, mean_dev_acc - std_dev_acc, mean_dev_acc + std_dev_acc, alpha = 0.3)
-    ax.set_xlabel("# data")
+    ax.set_xlabel("#data")
     ax.set_ylabel("Accuracy")
     plt.title(args.lang + ', threshold =' + str(args.sim_threshold))
     ax.legend()
@@ -124,6 +124,7 @@ for seed in range(1):
         init_dfa.make_graph()
         if (args.min):
             min_dfa.minimize()
+        # min_dfa.add_junk(alphabet=['a', 'b'])
         min_dfa.make_graph()
 
         acc = 0
