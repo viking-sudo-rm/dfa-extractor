@@ -5,6 +5,7 @@ import argparse
 from languages import *
 from utils import sequence_cross_entropy_with_logits, Tokenizer, get_data
 from models import Tagger
+from sampling import RandomSampler, BalancedSampler
 
 
 def parse_args():
@@ -13,6 +14,12 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--stop_threshold", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom2")
+    parser.add_argument("--n_train", type=int, default=100000)
+    parser.add_argument("--n_dev", type=int, default=1000)
+    parser.add_argument("--train_length", type=int, default=100)
+    parser.add_argument("--dev_length", type=int, default=200)
+    parser.add_argument("--seed", type=int, default=2)
+    parser.add_argument("--sampler", choices=["random", "balanced"], default=None)
     return parser.parse_args()
 
 args = parse_args()
@@ -37,9 +44,17 @@ elif (args.lang == "abbastar"):
 else:
     raise NotImplementedError("Non implemented language.")
 
+# Option to override the sampler.
+sampler = RandomSampler()
+if args.sampler:
+    sampler = BalancedSampler(lang) if args.sampler == "balanced" else RandomSampler()
 
-train_tokens, train_labels, train_mask, train_sents = get_data(lang, tokenizer, 0, 1000)
-dev_tokens, dev_labels, dev_mask, dev_sents = get_data(lang, tokenizer, 1001, 1100)
+random.seed(args.seed)
+torch.random.manual_seed(args.seed)
+
+print("Generating dataset...")
+train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.train_length)
+dev_tokens, dev_labels, dev_mask, dev_sents = get_data(sampler, lang, tokenizer, args.n_dev, args.dev_length)
 # train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
 # dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 

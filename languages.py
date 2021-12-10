@@ -1,12 +1,10 @@
 import random
 
 class Tomita1:
-
     """The language a^*."""
 
-    def generate(self, min_n, max_n):
-        for n in range(min_n, max_n):
-            yield "a" * n
+    def sample(self, length: int):
+        return "a" * length
 
     def trace_acceptance(self, string):
         state = 1
@@ -20,12 +18,10 @@ class Tomita1:
 
 
 class Tomita2:
-
     """The language (ab)^*."""
 
-    def generate(self, min_n, max_n):
-        for n in range(min_n, max_n):
-            yield "ab" * n
+    def sample(self, length: int):
+        return "ab" * (length // 2)
 
     def trace_acceptance(self, string):
         state = "b"
@@ -294,7 +290,23 @@ class Tomita7:
         return [int(s != "!") for s in states]
 
 class AbbastarGenerator:
+    def sample(self, length: int):
+        return "abba" * (length // 4)
 
-    def generate(self, min_n, max_n):
-        for n in range(min_n, max_n):
-            yield "abba" * n
+    def trace_acceptance(self, string):
+        state = "abba"
+        states = []
+        for token in string:
+            states.append(state)
+            if state == "abba" and token == "a":
+                state = "a"
+            elif state == "a" and token == "b":
+                state = "ab"
+            elif state == "ab" and token == "b":
+                state = "abb"
+            elif state == "abb" and token == "a":
+                state = "abba"
+            else:
+                state = "!"
+        states.append(state)
+        return [int(s != "!") for s in states]

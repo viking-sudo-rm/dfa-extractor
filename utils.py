@@ -8,8 +8,11 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Union, List
 import numpy
 
-def get_data(lang, tokenizer, min_n, max_n):
-    sents = list(lang.generate(min_n, max_n))
+from sampling import Sampler
+
+
+def get_data(sampler: Sampler, lang, tokenizer, n_samples, length):
+    sents = list(sampler.sample(n_samples, length))
     token_ids = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in sents], batch_first=True)
     labels = pad_sequence([torch.tensor(lang.trace_acceptance(sent)) for sent in sents], batch_first=True)
     mask = (token_ids != 0)
