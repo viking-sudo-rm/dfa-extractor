@@ -52,7 +52,7 @@ def build_fsa_from_dict(id, dict):
     # states are represented in a dfs fashion
     return my_dfa
 
-def cosine_merging(dfa, states, threshold):
+def cosine_merging(dfa, states, states_mask, threshold):
     cos = torch.nn.CosineSimilarity(dim=-1)
     total, pruned = 0, 0
     # print(states.shape)
@@ -62,6 +62,8 @@ def cosine_merging(dfa, states, threshold):
     for i in range(states.shape[0]):
         for j in range(i):
             if (i == j):
+                continue
+            if (states_mask[i] != states_mask[j]):
                 continue
             if (sim[i, j] > threshold):
                 total += 1
@@ -115,12 +117,14 @@ for seed in range(1):
         idx = [redundant_dfa.return_states(sent) for sent in train_sents]
         n_states = len(redundant_dfa.table.keys())
         states = torch.empty((n_states, 100))
+        states_mask = torch.empty((n_states), dtype=torch.long)
         for i, _r in enumerate(representations):
             states[idx[i]] = _r[train_mask[i]]
+            states_mask[idx[i]] = train_labels[i][train_mask[i]]
 
         # Merge states
         init_dfa = deepcopy(redundant_dfa)
-        min_dfa = cosine_merging(redundant_dfa, states, threshold=args.sim_threshold)
+        min_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
         init_dfa.make_graph()
         if (args.min):
             min_dfa.minimize()
