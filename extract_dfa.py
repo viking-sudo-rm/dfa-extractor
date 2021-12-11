@@ -94,7 +94,7 @@ elif (args.lang == "abbastar"):
 else:
     raise NotImplementedError("Non implemented language.")
 
-train_acc, dev_acc = {}, {}
+init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
 n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
 sampler = BalancedSampler(lang)
@@ -102,11 +102,11 @@ dev_sampler = TestSampler(lang)
 
 for seed in range(args.seeds):
     random.seed(seed)
-    train_acc[seed], dev_acc[seed] = [], []
+    init_train_acc[seed], init_dev_acc[seed], train_acc[seed], dev_acc[seed] = [], [], [], []
     for n in n_train:
-        # n train and dev samples of length 50 and 100, respectively
-        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 5)
-        _, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 10)
+        # n train and dev samples of length 10 and 50, respectively
+        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
+        _, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
         dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
         # Define the maximal dfa-trie and the neural net
@@ -142,5 +142,10 @@ for seed in range(args.seeds):
         _acc = score_whole_words(min_dfa, dev_sents, dev_labels) # valid for TestSampler
         dev_acc[seed].append(_acc)
 
+        _acc = score_all_prefixes(init_dfa, train_sents, train_labels)
+        init_train_acc[seed].append(_acc)
+        _acc = score_whole_words(init_dfa, dev_sents, dev_labels) # valid for TestSampler
+        init_dev_acc[seed].append(_acc)
+
 # Create plot for accuracy vs #data
-create_plot(train_acc, dev_acc, n_train, args.lang, args.sim_threshold)
+create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold)
