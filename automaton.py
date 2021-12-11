@@ -1,5 +1,6 @@
 import subprocess
 
+
 class Dfa:
     """
     A basic class that represents a deterministic finite automaton.
