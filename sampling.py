@@ -35,3 +35,16 @@ class RandomSampler(Sampler):
     def sample(self, n_samples: int, length: int):
         for _ in range(n_samples):
             yield random_string(length)
+
+class TestSampler(Sampler):
+    """Return half positive and half negative examples of random length in {0, `length`}"""
+
+    def __init__(self, lang):
+        self.lang = lang
+
+    def sample(self, n_samples: int, length: int):
+        for i in range(n_samples):
+            if (i < n_samples // 2):
+                yield self.lang.sample(random.randint(0, length))
+            else:
+                yield random_string(random.randint(0, length))

@@ -8,7 +8,7 @@ from languages import *
 from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
-from sampling import BalancedSampler
+from sampling import BalancedSampler, TestSampler
 
 
 def parse_args():
@@ -29,7 +29,13 @@ def parse_args():
 
 args = parse_args()
 
-def score(dfa, dataset, labels):
+def score_whole_words(dfa, dataset, labels):
+    acc = 0
+    for word, y in zip(dataset, labels):
+        acc += (dfa.accept(word) == y)
+    return (acc / len(dataset) * 100)
+
+def score_all_prefixes(dfa, dataset, labels):
     # Evaluate the performance of the extracted DFA on the dataset
     count, acc = 0, 0
     for i, word in enumerate(dataset):
@@ -38,7 +44,7 @@ def score(dfa, dataset, labels):
             acc += (dfa.accept(cur) == labels[i][j])
             cur += char
             count += 1
-        acc += (dfa.accept(cur) == labels[i][j]) # complete word
+        acc += (dfa.accept(cur) == labels[i][j+1]) # complete word
         count += 1
     return (acc / count * 100)
 
@@ -92,17 +98,20 @@ train_acc, dev_acc = {}, {}
 n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
 sampler = BalancedSampler(lang)
+dev_sampler = TestSampler(lang)
 
 for seed in range(args.seeds):
     random.seed(seed)
     train_acc[seed], dev_acc[seed] = [], []
     for n in n_train:
         # n train and dev samples of length 50 and 100, respectively
-        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 20) # returns n_samples + length sents
-        _, dev_labels, _, dev_sents = get_data(sampler, lang, tokenizer, n - 21, 21)
+        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 5)
+        _, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 10)
+        dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
         # Define the maximal dfa-trie and the neural net
         redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_labels)
+        assert(score_all_prefixes(redundant_dfa, train_sents, train_labels) == 100.)
         trained_model = Tagger(tokenizer.n_tokens, 10, 100)
         filename = f"./models/best{args.lang}.th"
         trained_model.load_state_dict(torch.load(filename))
@@ -128,9 +137,9 @@ for seed in range(args.seeds):
             min_dfa.make_graph()
 
         # Evaluate performance
-        _acc = score(min_dfa, train_sents, train_labels)
+        _acc = score_all_prefixes(min_dfa, train_sents, train_labels)
         train_acc[seed].append(_acc)
-        _acc = score(min_dfa, dev_sents, dev_labels)
+        _acc = score_whole_words(min_dfa, dev_sents, dev_labels) # valid for TestSampler
         dev_acc[seed].append(_acc)
 
 # Create plot for accuracy vs #data

@@ -219,7 +219,8 @@ class Tomita6:
                 elif diff == 2:
                     token = "a"
                 else:
-                    raise NotImplementedError
+                    return ""
+                    # raise NotImplementedError
             else:
                 token = random.choice(["a", "b"])
 
