@@ -1,9 +1,12 @@
+from typing import Union
+
 from pythomata import SimpleDFA
+from pythomata.impl.simple import SimpleNFA
 
 from automaton import Dfa
 
 
-def to_pythomata(dfa: Dfa) -> SimpleDFA:
+def to_pythomata_nfa(dfa: Dfa) -> SimpleNFA:
     """Convert our kind of DFA to a Pythomata DFA."""
     states = set(dfa.table.keys())
     accepting_states = {s for s, v in dfa.final.items() if v}
@@ -13,15 +16,22 @@ def to_pythomata(dfa: Dfa) -> SimpleDFA:
         transition_function[state] = {}
         for token, new_state in pairs:
             alphabet.add(token)
-            transition_function[state][token] = new_state
-    return SimpleDFA(states, alphabet, dfa.init_state, accepting_states, transition_function)
+            if token not in transition_function[state]:
+                transition_function[state][token] = set()
+            transition_function[state][token].add(new_state)
+    return SimpleNFA(states, alphabet, dfa.init_state, accepting_states, transition_function)
 
 
-def from_pythomata(pdfa: SimpleDFA) -> Dfa:
+def from_pythomata_dfa(auto: Union[SimpleDFA, SimpleNFA]) -> Dfa:
     """Converts a Pythomata DFA to our kind of DFA."""
-    states = [(s, s in pdfa.accepting_states) for s in pdfa.states]
+    states = [(s, s in auto.accepting_states) for s in auto.states]
     arcs = []
-    for state, mapping in pdfa.transition_function.items():
-        for token, new_state in mapping.items():
-            arcs.append((state, token, new_state))
-    return Dfa(pdfa.initial_state, states, arcs)
+    for state, mapping in auto.transition_function.items():
+        if isinstance(auto, SimpleDFA):
+            for token, new_state in mapping.items():
+                arcs.append((state, token, new_state))
+        else:
+            for token, new_states in mapping.items():
+                for new_state in new_states:
+                    arcs.append((state, token, new_state))
+    return Dfa(auto.initial_state, states, arcs)

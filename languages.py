@@ -268,7 +268,7 @@ class Tomita7:
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
-            self.sample(n)
+            yield self.sample(n)
 
     def sample(self, n: int):
         generator = "baba"
