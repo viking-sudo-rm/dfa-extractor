@@ -73,7 +73,6 @@ class Dfa:
             states[i+1] = cur_state
         return states
 
-
     def merge_states(self, state1, state2):
         """
         Merges state1 and state2.

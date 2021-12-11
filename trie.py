@@ -13,7 +13,7 @@ class TrieNode:
 class Trie(object):
     """The trie object"""
 
-    def __init__(self, corpus):
+    def __init__(self, corpus, labels):
         """
         The trie has at least the root node.
         The root node does not store any character
@@ -24,36 +24,31 @@ class Trie(object):
         self.arcs = []
         # self.strings = []
 
-        for word in corpus:
-            self.insert(word)
+        for word, label in zip(corpus, labels):
+            self.insert(word, label)
 
         self.states = [[i, False] for i in range(self.count + 1)]
 
         self.dfs(self.root)
 
-    def insert(self, word):
+    def insert(self, word, label):
         """Insert a word into the trie"""
         node = self.root
+        node.is_final = label[0]
 
         # Loop through each character in the word
         # Check if there is no child containing the character, create a new child for the current node
         for i, char in enumerate(word):
             if char in node.children:
-                known_path = True
                 node = node.children[char]
             else:
                 # If a character is not found,
                 # create a new node in the trie
                 self.count += 1
                 new_node = TrieNode(self.count, char)
+                new_node.is_final = label[i+1]
                 node.children[char] = new_node
                 node = new_node
-
-        # Mark the end of a word
-        node.is_final = True
-
-        # Increment the counter to indicate that we see this word once more
-        # node.counter += 1
 
     def dfs(self, node):
         """Depth-first traversal of the trie

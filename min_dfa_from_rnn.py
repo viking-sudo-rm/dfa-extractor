@@ -1,44 +1,27 @@
+import torch
+import argparse
+from copy import deepcopy
+
 from automaton import Dfa, equiv
 from trie import Trie
-import torch
 from languages import *
-import argparse
-from models import Tagger, LanguageModel
-from utils import sequence_cross_entropy_with_logits, get_data, Tokenizer
-from copy import deepcopy
-import matplotlib.pyplot as plt
-import numpy as np
-
-def plot_creation(train_acc, dev_acc, lengths, lang, threshold):
-
-    train_array = np.array(list(train_acc.values()))
-    mean_train_acc = np.average(train_array, axis=0)
-    std_train_acc = np.std(train_array, axis=0)
-    dev_array = np.array(list(dev_acc.values()))
-    mean_dev_acc = np.average(dev_array, axis=0)
-    std_dev_acc = np.std(dev_array, axis=0)
-
-    fig, ax = plt.subplots()
-    ax.plot(lengths, mean_train_acc, linestyle='-', marker='.', label='train acc')
-    plt.plot(lengths, mean_dev_acc, linestyle='-', marker='.', label='dev acc')
-    ax.fill_between(lengths, mean_train_acc - std_train_acc, mean_train_acc + std_train_acc, alpha = 0.3)
-    plt.fill_between(lengths, mean_dev_acc - std_dev_acc, mean_dev_acc + std_dev_acc, alpha = 0.3)
-    ax.set_xlabel("#data")
-    ax.set_ylabel("Accuracy")
-    plt.title(args.lang + ', threshold =' + str(args.sim_threshold))
-    ax.legend()
-    plotname = f"./images/{args.lang + str(args.sim_threshold)}.pdf"
-    # plt.savefig(plotname)
-    plt.show()
+from create_plot import create_plot
+from models import Tagger
+from utils import get_data, Tokenizer
+from sampling import RandomSampler
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", type=str, default="Tom2")
     # parser.add_argument("--length", type=int, default=2)
-    parser.add_argument("--upper_length", type=int, default=5)
-    parser.add_argument("--lower_length", type=int, default=5)
+    parser.add_argument("--n_train_high", type=int, default=6)
+    parser.add_argument("--n_train_low", type=int, default=5)
     parser.add_argument("--sim_threshold", type=float, default=0.5)
+    parser.add_argument("--seeds", type=int, default=1)
+    parser.add_argument("--fst", dest='fst', action='store_true')
+    parser.add_argument("--no-fst", dest='fst', action='store_false')
+    parser.set_defaults(fst=False)
     parser.add_argument('--minimize', dest='min', action='store_true')
     parser.add_argument('--no-minimize', dest='min', action='store_false')
     parser.set_defaults(min=False)
@@ -46,19 +29,31 @@ def parse_args():
 
 args = parse_args()
 
-def build_fsa_from_dict(id, dict):
-    t = Trie(dict)
+def score(dfa, dataset, labels):
+    # Evaluate the performance of the extracted DFA on the dataset
+    count, acc = 0, 0
+    for i, word in enumerate(dataset):
+        cur = ''
+        for j, char in enumerate(word):
+            acc += (dfa.accept(cur) == labels[i][j])
+            cur += char
+            count += 1
+        acc += (dfa.accept(cur) == labels[i][j]) # complete word
+        count += 1
+    return (acc / count * 100)
+
+def build_dfa_from_dict(id, dict, labels):
+    t = Trie(dict, labels)
     my_dfa = Dfa(id, t.states, t.arcs)
     # states are represented in a dfs fashion
     return my_dfa
 
 def cosine_merging(dfa, states, states_mask, threshold):
+
     cos = torch.nn.CosineSimilarity(dim=-1)
-    total, pruned = 0, 0
-    # print(states.shape)
-    # print((states @ states.transpose(0, 1)).shape)
-    # x = torch.randn(32, 100, 25)
     sim = cos(states[None, :, :], states[:, None, :])
+    
+    total, pruned = 0, 0
     for i in range(states.shape[0]):
         for j in range(i):
             if (i == j):
@@ -70,7 +65,7 @@ def cosine_merging(dfa, states, states_mask, threshold):
                 res = dfa.merge_states(i, j)
                 pruned += 1 - res
     dfa.id = str(dfa.id) + 'min'
-    print("Found", total, "different pairs of states to be equivalent.", "Pruned", pruned)
+    # print("Found", total, "different pairs of states to be equivalent.", "Pruned", pruned)
 
     return dfa
 
@@ -94,20 +89,20 @@ else:
     raise NotImplementedError("Non implemented language.")
 
 train_acc, dev_acc = {}, {}
-lengths = range(args.lower_length, args.upper_length)
+n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
+sampler = RandomSampler()
 
-
-for seed in range(1):
+for seed in range(args.seeds):
     random.seed(seed)
     train_acc[seed], dev_acc[seed] = [], []
-    for n in lengths:
-        train_tokens, train_labels, train_mask, train_sents = get_data(lang, tokenizer, 0, n)
-        _, _, _, dev_sents = get_data(lang, tokenizer, n+1, n+101)
+    for n in n_train:
+        # n train and dev samples of length 50 and 100, respectively
+        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 50)
+        _, dev_labels, _, dev_sents = get_data(sampler, lang, tokenizer, n, 100)
 
-        redundant_dfa = build_fsa_from_dict(id=args.lang, dict=train_sents)
-        redundant_dfa.make_graph()
-
+        # Define the maximal dfa-trie and the neural net
+        redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_labels)
         trained_model = Tagger(tokenizer.n_tokens, 10, 100)
         filename = f"./models/best{args.lang}.th"
         trained_model.load_state_dict(torch.load(filename))
@@ -125,25 +120,18 @@ for seed in range(1):
         # Merge states
         init_dfa = deepcopy(redundant_dfa)
         min_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
-        init_dfa.make_graph()
         if (args.min):
             min_dfa.minimize()
         # min_dfa.add_junk(alphabet=['a', 'b'])
-        min_dfa.make_graph()
+        if (args.fst):
+            init_dfa.make_graph()
+            min_dfa.make_graph()
 
-        acc = 0
-        for word in train_sents:
-            acc += min_dfa.accept(word)
+        # Evaluate performance
+        _acc = score(min_dfa, train_sents, train_labels)
+        train_acc[seed].append(_acc)
+        _acc = score(min_dfa, dev_sents, dev_labels)
+        dev_acc[seed].append(_acc)
 
-        train_acc[seed].append(acc / len(train_sents) * 100)
-
-        acc = 0
-        # if (args.lang == "Tom6"):
-        #     gen = lang.generate(n+6, n+106)
-        # else:
-        #     gen = lang.generate(n+2, n+102)
-        for word in dev_sents:
-            acc += min_dfa.accept(word)
-        dev_acc[seed].append(acc)
-
-plot_creation(train_acc, dev_acc, lengths, args.lang, args.sim_threshold)
+# Create plot for accuracy vs #data
+create_plot(train_acc, dev_acc, n_train, args.lang, args.sim_threshold)
