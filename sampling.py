@@ -26,7 +26,7 @@ class BalancedSampler(Sampler):
             string += random_string(length - n)
             yield string
         for n in range(n_samples):
-            string = self.lang.sample(n)
+            string = self.lang.sample(n) # redundant?
             yield random_string(length)
 
 

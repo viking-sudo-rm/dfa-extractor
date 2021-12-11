@@ -8,7 +8,7 @@ from languages import *
 from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
-from sampling import RandomSampler
+from sampling import BalancedSampler
 
 
 def parse_args():
@@ -52,7 +52,7 @@ def cosine_merging(dfa, states, states_mask, threshold):
 
     cos = torch.nn.CosineSimilarity(dim=-1)
     sim = cos(states[None, :, :], states[:, None, :])
-    
+
     total, pruned = 0, 0
     for i in range(states.shape[0]):
         for j in range(i):
@@ -91,15 +91,15 @@ else:
 train_acc, dev_acc = {}, {}
 n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
-sampler = RandomSampler()
+sampler = BalancedSampler(lang)
 
 for seed in range(args.seeds):
     random.seed(seed)
     train_acc[seed], dev_acc[seed] = [], []
     for n in n_train:
         # n train and dev samples of length 50 and 100, respectively
-        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 50)
-        _, dev_labels, _, dev_sents = get_data(sampler, lang, tokenizer, n, 100)
+        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 20) # returns n_samples + length sents
+        _, dev_labels, _, dev_sents = get_data(sampler, lang, tokenizer, n - 21, 21)
 
         # Define the maximal dfa-trie and the neural net
         redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_labels)

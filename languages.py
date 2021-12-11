@@ -116,16 +116,20 @@ class Tomita4:
     def generate(self, min_n, max_n):
         # Don't really need to generate one per length here, but we do.
         for n in range(min_n, max_n):
-            state = 0
-            tokens = []
-            for _ in range(n):
-                token = "b" if state == 2 else random.choice(["a", "b"])
-                tokens.append(token)
-                if token == "b":
-                    state = 0
-                else:
-                    state += 1
-            yield "".join(tokens)
+            yield self.sample(n)
+
+    def sample(self, length: int):
+        state = 0
+        tokens = []
+        for _ in range(length):
+            token = "b" if state == 2 else random.choice(["a", "b"])
+            tokens.append(token)
+            if token == "b":
+                state = 0
+            else:
+                state += 1
+        return "".join(tokens)
+
 
     def trace_acceptance(self, string):
         state = 0
@@ -262,16 +266,19 @@ class Tomita6:
 class Tomita7:
 
     def generate(self, min_n, max_n):
-        generator = "baba"
         for n in range(min_n, max_n):
-            length = [0] * 5
-            for i in range(1, 5):
-                length[i] = random.randint(0, n - length[i-1])
-            sub = random.sample(length[1:], 4)
-            final = ""
-            for i in range(4):
-                final += generator[i] * sub[i]
-            yield final
+            self.sample(n)
+
+    def sample(self, n: int):
+        generator = "baba"
+        length = [0] * 5
+        for i in range(1, 5):
+            length[i] = random.randint(0, n - length[i-1])
+        sub = random.sample(length[1:], 4)
+        final = ""
+        for i in range(4):
+            final += generator[i] * sub[i]
+        return final
 
     def trace_acceptance(self, string):
         states = []
