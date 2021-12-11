@@ -1,7 +1,31 @@
+from typing import List
 import random
+from abc import ABCMeta, abstractmethod
 
-class Tomita1:
+
+class Language(metaclass=ABCMeta):
+    @abstractmethod
+    def sample(self, length: int) -> str:
+        """Return a string where index n is valid."""
+        return NotImplemented
+    
+    @abstractmethod
+    def trace_acceptance(self, string: str) -> List[int]:
+        """Return a list of accept/reject decisions for every prefix of `string`."""
+        return NotImplemented
+    
+    @classmethod
+    def from_string(cls, name: str, *args, **kwargs) -> "Language":
+        for subclass in cls.__subclasses__():
+            if subclass.name == name:
+                return subclass(*args, **kwargs)
+        return None
+
+
+class Tomita1(Language):
     """The language a^*."""
+
+    name = "Tom1"
 
     def sample(self, length: int):
         return "a" * length
@@ -17,8 +41,10 @@ class Tomita1:
         return states
 
 
-class Tomita2:
+class Tomita2(Language):
     """The language (ab)^*."""
+
+    name = "Tom2"
 
     def sample(self, length: int):
         return "ab" * (length // 2)
@@ -38,12 +64,10 @@ class Tomita2:
         return [int(s == "b") for s in states]
 
 
-class Tomita3:
+class Tomita3(Language):
+    """An odd number of a's must be followed be an even number of b's."""
 
-    """An odd number of a's must be followed be an even number of b's.
-
-    Choose tokens randomly, except at the last index.
-    """
+    name = "Tom3"
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
@@ -109,9 +133,10 @@ class Tomita3:
     #             cand = ''.join(random.choices("ab", k=n))
     #         yield cand
 
-class Tomita4:
-
+class Tomita4(Language):
     """All strings where three a's don't occur in a row."""
+
+    name = "Tom4"
 
     def generate(self, min_n, max_n):
         # Don't really need to generate one per length here, but we do.
@@ -149,9 +174,10 @@ class Tomita4:
         return [int(s != -1) for s in states]
 
 
-class Tomita5:
-
+class Tomita5(Language):
     """All strings w where #_a(w) and #_b(w) are even."""
+
+    name = "Tom5"
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
@@ -189,11 +215,12 @@ class Tomita5:
         return statuses
 
 
-class Tomita6:
-
+class Tomita6(Language):
     """The number of a's and b's is the same mod 3.
 
     Can do this the dumb way since it should be relatively fast."""
+
+    name = "Tom6"
 
     def sample(self, n):
         tokens = []
@@ -264,7 +291,9 @@ class Tomita6:
     #         yield cand
 
 
-class Tomita7:
+class Tomita7(Language):
+
+    name = "Tom7"
 
     def generate(self, min_n, max_n):
         for n in range(min_n, max_n):
@@ -297,7 +326,10 @@ class Tomita7:
         states.append(state)
         return [int(s != "!") for s in states]
 
-class AbbastarGenerator:
+class AbbastarGenerator(Language):
+
+    name = "abbastar"
+
     def sample(self, length: int):
         return "abba" * (length // 4)
 

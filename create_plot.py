@@ -33,6 +33,7 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
     ax.set_ylabel("Accuracy")
     plt.title(lang + ', threshold =' + str(threshold))
     ax.legend()
-    plotname = f"./images/Accuracy_{lang + str(threshold)}.pdf"
+    plotname = f"./images/acc-{lang}-{str(threshold)}.pdf"
+    print(f"Saved {plotname}")
     plt.savefig(plotname)
     # plt.show()

@@ -1,23 +1,25 @@
 import torch
 import argparse
 from copy import deepcopy
+import random
 
 from automaton import Dfa, equiv
 from trie import Trie
-from languages import *
+from languages import Language
 from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
 from sampling import BalancedSampler, TestSampler
+from pythomata_wrapper import to_pythomata_nfa, from_pythomata_dfa
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", type=str, default="Tom2")
     # parser.add_argument("--length", type=int, default=2)
+    parser.add_argument("--n_train_low", type=int, default=2)
     parser.add_argument("--n_train_high", type=int, default=6)
-    parser.add_argument("--n_train_low", type=int, default=5)
-    parser.add_argument("--sim_threshold", type=float, default=0.5)
+    parser.add_argument("--sim_threshold", type=float, default=.99)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--fst", dest='fst', action='store_true')
     parser.add_argument("--no-fst", dest='fst', action='store_false')
@@ -75,30 +77,21 @@ def cosine_merging(dfa, states, states_mask, threshold):
 
     return dfa
 
-if (args.lang == "Tom1"):
-    lang = Tomita1()
-elif (args.lang == "Tom2"):
-    lang = Tomita2()
-elif (args.lang == "Tom3"):
-    lang = Tomita3()
-elif (args.lang == "Tom4"):
-    lang = Tomita4()
-elif (args.lang == "Tom5"):
-    lang = Tomita5()
-elif (args.lang == "Tom6"):
-    lang = Tomita6()
-elif (args.lang == "Tom7"):
-    lang = Tomita7()
-elif (args.lang == "abbastar"):
-    lang = AbbastarGenerator()
-else:
-    raise NotImplementedError("Non implemented language.")
+
+def minimize(auto: Dfa) -> Dfa:
+    nfa = to_pythomata_nfa(auto)
+    min_dfa = nfa.determinize().minimize().trim()
+    return from_pythomata_dfa(min_dfa)
+
 
 init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
 n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
+lang = Language.from_string(args.lang)
 sampler = BalancedSampler(lang)
 dev_sampler = TestSampler(lang)
+if lang is None:
+    raise NotImplementedError("Non implemented language.")
 
 for seed in range(args.seeds):
     random.seed(seed)
@@ -106,7 +99,7 @@ for seed in range(args.seeds):
     for n in n_train:
         # n train and dev samples of length 10 and 50, respectively
         train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
-        _, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
+        dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
         dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
         # Define the maximal dfa-trie and the neural net
@@ -116,8 +109,16 @@ for seed in range(args.seeds):
         filename = f"./models/best{args.lang}.th"
         trained_model.load_state_dict(torch.load(filename))
 
+        # Get the model predictions on the train/dev set
+        with torch.no_grad():
+            train_results = trained_model(train_tokens, train_labels, train_mask)
+            dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
+        train_preds = train_results["predictions"]
+        _dev_preds = dev_results["predictions"]
+        dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
+
         # Obtain representations
-        representations = trained_model(train_tokens, train_labels, train_mask)["states"]
+        representations = train_results["states"]
         idx = [redundant_dfa.return_states(sent) for sent in train_sents]
         n_states = len(redundant_dfa.table.keys())
         states = torch.empty((n_states, 100))
@@ -128,23 +129,28 @@ for seed in range(args.seeds):
 
         # Merge states
         init_dfa = deepcopy(redundant_dfa)
-        min_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
-        if (args.min):
-            min_dfa.minimize()
-        # min_dfa.add_junk(alphabet=['a', 'b'])
+        merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
+        # The minimization is suuuper slow :(, probably because there is determinization first.
+        # min_dfa = minimize(merge_dfa)
+
         if (args.fst):
             init_dfa.make_graph()
-            min_dfa.make_graph()
+            merge_dfa.make_graph()
 
         # Evaluate performance
-        _acc = score_all_prefixes(min_dfa, train_sents, train_labels)
+        # Can either use preds or labels here, depending on what we want to evaluate
+        # TODO: Maybe plot both on the same graph? Or add flag
+        train_gold = train_preds
+        dev_gold = dev_preds
+
+        _acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
         train_acc[seed].append(_acc)
-        _acc = score_whole_words(min_dfa, dev_sents, dev_labels) # valid for TestSampler
+        _acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
         dev_acc[seed].append(_acc)
 
-        _acc = score_all_prefixes(init_dfa, train_sents, train_labels)
+        _acc = score_all_prefixes(init_dfa, train_sents, train_gold)
         init_train_acc[seed].append(_acc)
-        _acc = score_whole_words(init_dfa, dev_sents, dev_labels) # valid for TestSampler
+        _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
         init_dev_acc[seed].append(_acc)
 
 # Create plot for accuracy vs #data

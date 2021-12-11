@@ -16,5 +16,5 @@ python train_rnn.py --lang=Tom6 --n_train=100000
 
 To extract a DFA from an RNN, and create a plot of accuracy vs number of data in {1, ..., 20} (doesn't require openfst):
 ```shell
-python min_dfa_from_rnn.py --lang=Tom6 --n_train_low=1 --n_train_high=20
+python extract_dfa.py --lang=Tom6 --n_train_low=2 --n_train_high=20
 ```

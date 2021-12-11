@@ -1,11 +1,12 @@
 import torch
 from tqdm import trange
 import argparse
+import random
 
-from languages import *
-from utils import sequence_cross_entropy_with_logits, Tokenizer, get_data
+from languages import Language
+from utils import Tokenizer, get_data
 from models import Tagger
-from sampling import RandomSampler, BalancedSampler
+from sampling import BalancedSampler
 
 
 def parse_args():
@@ -24,26 +25,10 @@ def parse_args():
 args = parse_args()
 use_gpu = torch.cuda.is_available()
 tokenizer = Tokenizer()
-if (args.lang == "Tom1"):
-    lang = Tomita1()
-elif (args.lang == "Tom2"):
-    lang = Tomita2()
-elif (args.lang == "Tom3"):
-    lang = Tomita3()
-elif (args.lang == "Tom4"):
-    lang = Tomita4()
-elif (args.lang == "Tom5"):
-    lang = Tomita5()
-elif (args.lang == "Tom6"):
-    lang = Tomita6()
-elif (args.lang == "Tom7"):
-    lang = Tomita7()
-elif (args.lang == "abbastar"):
-    lang = AbbastarGenerator()
-else:
-    raise NotImplementedError("Non implemented language.")
-
+lang = Language.from_string(args.lang)
 sampler = BalancedSampler(lang)
+if lang is None:
+    raise NotImplementedError("Non implemented language.")
 
 random.seed(args.seed)
 torch.random.manual_seed(args.seed)
