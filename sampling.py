@@ -1,5 +1,6 @@
 """Classes to sample strings from a formal language."""
 
+from typing import Iterator
 from abc import ABCMeta, abstractmethod
 import random
 
@@ -10,7 +11,7 @@ def random_string(n: int) -> str:
 
 class Sampler(metaclass=ABCMeta):
     @abstractmethod
-    def sample(self, min_n: int, max_n: int):
+    def sample(self, min_n: int, length: int) -> Iterator[str]:
         return NotImplemented
 
 
