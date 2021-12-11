@@ -15,18 +15,16 @@ class Sampler(metaclass=ABCMeta):
 
 
 class BalancedSampler(Sampler):
-    """Return `n_samples` random strings, plus a sample with a valid prefix of every length up to `length`."""
+    """Choose half the samples to contain strings positive at max length. The other half are random."""
 
     def __init__(self, lang):
         self.lang = lang
 
     def sample(self, n_samples: int, length: int):
-        for n in range(length):
-            string = self.lang.sample(n)
-            string += random_string(length - n)
-            yield string
-        for n in range(n_samples):
-            string = self.lang.sample(n) # redundant?
+        assert n_samples > 1, "For balanced sampler, need more than 1 sample."
+        n_half = n_samples // 2
+        for _ in range(n_half):
+            yield self.lang.sample(length)
             yield random_string(length)
 
 

@@ -19,7 +19,6 @@ def parse_args():
     parser.add_argument("--train_length", type=int, default=100)
     parser.add_argument("--dev_length", type=int, default=200)
     parser.add_argument("--seed", type=int, default=2)
-    parser.add_argument("--sampler", choices=["random", "balanced"], default=None)
     return parser.parse_args()
 
 args = parse_args()
@@ -44,10 +43,7 @@ elif (args.lang == "abbastar"):
 else:
     raise NotImplementedError("Non implemented language.")
 
-# Option to override the sampler.
-sampler = RandomSampler()
-if args.sampler:
-    sampler = BalancedSampler(lang) if args.sampler == "balanced" else RandomSampler()
+sampler = BalancedSampler(lang)
 
 random.seed(args.seed)
 torch.random.manual_seed(args.seed)
