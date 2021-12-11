@@ -36,13 +36,11 @@ torch.random.manual_seed(args.seed)
 print("Generating dataset...")
 train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.train_length)
 dev_tokens, dev_labels, dev_mask, dev_sents = get_data(sampler, lang, tokenizer, args.n_dev, args.dev_length)
-# train = pad_sequence([torch.tensor(tokenizer.tokenize(sent)) for sent in lang.generate(0, 1000)], batch_first=True)
-# dev = pad_sequence([torch.tensor(tokenizer.tokenize(sent, add=False)) for sent in lang.generate(1001, 1100)], batch_first=True)
 
 print("Sample input")
 print("tokens", train_tokens[3, :10])
 print("labels", train_labels[3, :10])
-print("mask  ", train_mask[3, :10].int())
+print("mask  ", train_mask[3, :10].bool())
 print("ntoken", tokenizer.n_tokens)
 
 model = Tagger(tokenizer.n_tokens, 10, 100)
@@ -86,8 +84,11 @@ for epoch in range(args.n_epochs):
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
-        print("Best model! Saved models/best'--lang'.th")
-        torch.save(model.state_dict(), "models/best" + str(args.lang) + ".th")
+
+    if acc >= best_acc:
+        path = "models/best" + str(args.lang) + ".th"
+        print(f"Best model! Saved {path}")
+        torch.save(model.state_dict(), path)
 
     if epoch - best_epoch > args.stop_threshold:
         print("Stopped early!")
