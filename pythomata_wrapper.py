@@ -22,6 +22,20 @@ def to_pythomata_nfa(dfa: Dfa) -> SimpleNFA:
     return SimpleNFA(states, alphabet, dfa.init_state, accepting_states, transition_function)
 
 
+def to_pythomata_dfa(dfa: Dfa) -> SimpleDFA:
+    """Given a deterministic automaton, get deterministic one."""
+    states = set(dfa.table.keys())
+    accepting_states = {s for s, v in dfa.final.items() if v}
+    alphabet = set()
+    transition_function = {}
+    for state, pairs in dfa.table.items():
+        transition_function[state] = {}
+        for token, new_state in pairs:
+            alphabet.add(token)
+            transition_function[state][token] = new_state
+    return SimpleDFA(states, alphabet, dfa.init_state, accepting_states, transition_function)
+
+
 def from_pythomata_dfa(auto: Union[SimpleDFA, SimpleNFA]) -> Dfa:
     """Converts a Pythomata DFA to our kind of DFA."""
     states = [(s, s in auto.accepting_states) for s in auto.states]

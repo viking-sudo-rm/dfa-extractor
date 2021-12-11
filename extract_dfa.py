@@ -10,7 +10,7 @@ from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
 from sampling import BalancedSampler, TestSampler
-from pythomata_wrapper import to_pythomata_nfa, from_pythomata_dfa
+from pythomata_wrapper import to_pythomata_nfa, to_pythomata_dfa, from_pythomata_dfa
 
 
 def parse_args():
@@ -106,7 +106,7 @@ for seed in range(args.seeds):
         redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_labels)
         assert(score_all_prefixes(redundant_dfa, train_sents, train_labels) == 100.)
         trained_model = Tagger(tokenizer.n_tokens, 10, 100)
-        filename = f"./models/best{args.lang}.th"
+        filename = f"./models/{args.lang}/best.th"
         trained_model.load_state_dict(torch.load(filename))
 
         # Get the model predictions on the train/dev set
@@ -152,6 +152,16 @@ for seed in range(args.seeds):
         init_train_acc[seed].append(_acc)
         _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
         init_dev_acc[seed].append(_acc)
+
+        # if n > 40:
+        #     print("Yo got to stuff")
+        #     pdfa = to_pythomata_dfa(merge_dfa)
+        #     pdfa = pdfa.minimize().trim()
+        #     print(pdfa.transition_function)
+        #     break
+        #     # graph.render("out.pdf")
+        #     # break
+
 
 # Create plot for accuracy vs #data
 create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold)

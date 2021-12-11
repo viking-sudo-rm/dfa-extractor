@@ -2,6 +2,11 @@
 
 Extracting DFAs from RNNs using learning and state merging techniques.
 
+## Git LFS
+
+This project uses Git LFS to track .th files for models. See [here](https://git-lfs.github.com/) for more info.
+
+
 ## Command Reference
 
 To train an RNN language model:

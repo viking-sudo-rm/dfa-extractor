@@ -2,6 +2,7 @@ import torch
 from tqdm import trange
 import argparse
 import random
+import os
 
 from languages import Language
 from utils import Tokenizer, get_data
@@ -11,7 +12,7 @@ from sampling import BalancedSampler
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_epochs", type=int, default=10)
+    parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--stop_threshold", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom2")
@@ -20,6 +21,7 @@ def parse_args():
     parser.add_argument("--train_length", type=int, default=100)
     parser.add_argument("--dev_length", type=int, default=200)
     parser.add_argument("--seed", type=int, default=2)
+    parser.add_argument("--device", type=int, default=0)
     return parser.parse_args()
 
 args = parse_args()
@@ -45,11 +47,17 @@ print("ntoken", tokenizer.n_tokens)
 
 model = Tagger(tokenizer.n_tokens, 10, 100)
 if use_gpu:
-    model.cuda()
+    print(f"Using CUDA device {args.device}")
+    model.cuda(args.device)
 optim = torch.optim.AdamW(model.parameters())
 
 best_acc = 0.
 best_epoch = -1
+
+model_dir = os.path.join("models", args.lang)
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+saved_epochs = []
 
 for epoch in range(args.n_epochs):
     print(f"Starting epoch {epoch}...")
@@ -64,9 +72,9 @@ for epoch in range(args.n_epochs):
         batch_labels = train_labels[batch_idx:batch_idx + args.batch_size]
         batch_mask = train_mask[batch_idx:batch_idx + args.batch_size]
         if use_gpu:
-            batch_tokens = batch_tokens.cuda()
-            batch_labels = batch_labels.cuda()
-            batch_mask = batch_mask.cuda()
+            batch_tokens = batch_tokens.cuda(args.device)
+            batch_labels = batch_labels.cuda(args.device)
+            batch_mask = batch_mask.cuda(args.device)
         output_dict = model(batch_tokens, batch_labels, batch_mask)
         loss = output_dict["loss"]
         loss.backward()
@@ -74,9 +82,9 @@ for epoch in range(args.n_epochs):
 
     with torch.no_grad():
         if use_gpu:
-            dev_tokens = dev_tokens.cuda()
-            dev_labels = dev_labels.cuda()
-            dev_mask = dev_mask.cuda()
+            dev_tokens = dev_tokens.cuda(args.device)
+            dev_labels = dev_labels.cuda(args.device)
+            dev_mask = dev_mask.cuda(args.device)
         dev_output_dict = model(dev_tokens, dev_labels, dev_mask)
         acc = dev_output_dict["accuracy"]
         print("Dev acc:", acc.item())
@@ -86,10 +94,19 @@ for epoch in range(args.n_epochs):
         best_epoch = epoch
 
     if acc >= best_acc:
-        path = "models/best" + str(args.lang) + ".th"
-        print(f"Best model! Saved {path}")
-        torch.save(model.state_dict(), path)
+        best_path = os.path.join(model_dir, "best.th")
+        torch.save(model.state_dict(), best_path)
+        epoch_path = os.path.join(model_dir, f"epoch{epoch}.th")
+        torch.save(model.state_dict(), epoch_path)
+        saved_epochs.append(epoch)
+        print(f"Best model! Saved")
 
     if epoch - best_epoch > args.stop_threshold:
         print("Stopped early!")
         break
+
+print("Cleaning up sub-optimal checkpoints...")
+for epoch in saved_epochs:
+    if epoch < best_epoch:
+        epoch_path = os.path.join(model_dir, f"epoch{epoch}.th")
+        os.remove(epoch_path)
