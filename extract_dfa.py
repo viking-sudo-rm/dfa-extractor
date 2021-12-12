@@ -30,6 +30,7 @@ def parse_args():
     parser.set_defaults(min=False)
     parser.add_argument('--epoch', type=str, default="best")
     parser.add_argument('--eval', type=str, default="preds")
+    parser.add_argument("--no_state_count", action="store_true")
     return parser.parse_args()
 
 args = parse_args()
@@ -167,18 +168,11 @@ for seed in range(args.seeds):
         _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
         init_dev_acc[seed].append(_acc)
 
-        merge_pdfa = to_pythomata_dfa(merge_dfa)
-        min_pdfa = merge_pdfa.minimize().trim()
-        n_merged_states[seed].append(len(merge_pdfa.states))
-        n_min_states[seed].append(len(min_pdfa.states))
-        # if n > 40:
-        #     print("Yo got to stuff")
-        #     pdfa = to_pythomata_dfa(merge_dfa)
-        #     pdfa = pdfa.minimize().trim()
-        #     print(pdfa.transition_function)
-        #     break
-        #     # graph.render("out.pdf")
-        #     # break
+        if not args.no_state_count:
+            merge_pdfa = to_pythomata_dfa(merge_dfa)
+            min_pdfa = merge_pdfa.minimize().trim()
+            n_merged_states[seed].append(len(merge_pdfa.states))
+            n_min_states[seed].append(len(min_pdfa.states))
 
 
 # Create plot for accuracy vs #data
