@@ -10,13 +10,12 @@ from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
 from sampling import BalancedSampler, TestSampler
-from pythomata_wrapper import to_pythomata_nfa, to_pythomata_dfa, from_pythomata_dfa
+# from pythomata_wrapper import to_pythomata_nfa, to_pythomata_dfa, from_pythomata_dfa
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", type=str, default="Tom2")
-    # parser.add_argument("--length", type=int, default=2)
     parser.add_argument("--n_train_low", type=int, default=2)
     parser.add_argument("--n_train_high", type=int, default=6)
     parser.add_argument("--sim_threshold", type=float, default=.99)
@@ -27,6 +26,8 @@ def parse_args():
     parser.add_argument('--minimize', dest='min', action='store_true')
     parser.add_argument('--no-minimize', dest='min', action='store_false')
     parser.set_defaults(min=False)
+    parser.add_argument('--epoch', type=str, default="best")
+    parser.add_argument('--eval', type=str, default="preds")
     return parser.parse_args()
 
 args = parse_args()
@@ -77,12 +78,10 @@ def cosine_merging(dfa, states, states_mask, threshold):
 
     return dfa
 
-
-def minimize(auto: Dfa) -> Dfa:
-    nfa = to_pythomata_nfa(auto)
-    min_dfa = nfa.determinize().minimize().trim()
-    return from_pythomata_dfa(min_dfa)
-
+# def minimize(auto: Dfa) -> Dfa:
+#     nfa = to_pythomata_nfa(auto)
+#     min_dfa = nfa.determinize().minimize().trim()
+#     return from_pythomata_dfa(min_dfa)
 
 init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
 n_train = range(args.n_train_low, args.n_train_high)
@@ -97,25 +96,37 @@ for seed in range(args.seeds):
     random.seed(seed)
     init_train_acc[seed], init_dev_acc[seed], train_acc[seed], dev_acc[seed] = [], [], [], []
     for n in n_train:
-        # n train and dev samples of length 10 and 50, respectively
+        # n train and 1000 dev samples of length 10 and 50, respectively
         train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
         dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
         dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
-        # Define the maximal dfa-trie and the neural net
-        redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_labels)
-        assert(score_all_prefixes(redundant_dfa, train_sents, train_labels) == 100.)
+        # Define the neural net and get predictions on the train/dev set
         trained_model = Tagger(tokenizer.n_tokens, 10, 100)
-        filename = f"./models/{args.lang}/best.th"
-        trained_model.load_state_dict(torch.load(filename))
-
-        # Get the model predictions on the train/dev set
+        filename = f"./models/{args.lang}/{args.epoch}.th"
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        trained_model.load_state_dict(torch.load(filename, map_location=device))
         with torch.no_grad():
             train_results = trained_model(train_tokens, train_labels, train_mask)
             dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
         train_preds = train_results["predictions"]
         _dev_preds = dev_results["predictions"]
         dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
+
+        # Can either use preds or labels here, depending on what we want to evaluate
+        # TODO: Maybe plot both on the same graph?
+        if (args.eval == "preds"):
+            train_gold = train_preds
+            dev_gold = dev_preds
+        elif (args.eval == "labels"):
+            train_gold = train_labels
+            dev_gold = dev_labels
+        else:
+            raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
+
+        # Define the maximal dfa-trie
+        redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_gold) # build the trie based on train_gold
+        assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
 
         # Obtain representations
         representations = train_results["states"]
@@ -138,11 +149,6 @@ for seed in range(args.seeds):
             merge_dfa.make_graph()
 
         # Evaluate performance
-        # Can either use preds or labels here, depending on what we want to evaluate
-        # TODO: Maybe plot both on the same graph? Or add flag
-        train_gold = train_preds
-        dev_gold = dev_preds
-
         _acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
         train_acc[seed].append(_acc)
         _acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
@@ -164,4 +170,4 @@ for seed in range(args.seeds):
 
 
 # Create plot for accuracy vs #data
-create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold)
+create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)

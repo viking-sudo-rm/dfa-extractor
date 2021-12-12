@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, threshold):
+def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, threshold, epoch, eval):
 
 
     init_train_array = np.array(list(init_train_acc.values()))
@@ -20,8 +20,8 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
 
     fig, ax = plt.subplots()
 
-    ax.plot(n_data, init_mean_train_acc, linestyle='--', marker='.', label='initial train acc')
-    ax.plot(n_data, init_mean_dev_acc, linestyle='--', marker='.', label='initial dev acc')
+    ax.plot(n_data, init_mean_train_acc, linestyle='--', marker='+', label='initial train acc')
+    ax.plot(n_data, init_mean_dev_acc, linestyle='--', marker='+', label='initial dev acc')
     ax.fill_between(n_data, init_mean_train_acc - init_std_train_acc, init_mean_train_acc + init_std_train_acc, alpha = 0.3)
     ax.fill_between(n_data, init_mean_dev_acc - init_std_dev_acc, init_mean_dev_acc + init_std_dev_acc, alpha = 0.3)
 
@@ -31,9 +31,14 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
     ax.fill_between(n_data, mean_dev_acc - std_dev_acc, mean_dev_acc + std_dev_acc, alpha = 0.3)
     ax.set_xlabel("#data")
     ax.set_ylabel("Accuracy")
-    plt.title(lang + ', threshold =' + str(threshold))
+    if (epoch == "best"):
+        # Do not mention epoch in the title
+        title = f"{lang}, threshold = {str(threshold)}, eval = {eval}"
+    else:
+        title = f"{lang}, threshold = {str(threshold)}, {epoch}, eval = {eval}"
+    plt.title(title)
     ax.legend()
-    plotname = f"./images/acc-{lang}-{str(threshold)}.pdf"
+    plotname = f"./images/acc-{lang}-{str(threshold)}-{epoch}-{eval}.pdf"
     print(f"Saved {plotname}")
     plt.savefig(plotname)
     # plt.show()
