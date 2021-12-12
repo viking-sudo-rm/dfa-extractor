@@ -2,8 +2,10 @@ import torch
 import argparse
 from copy import deepcopy
 import random
+from collections import defaultdict
 
 from automaton import Dfa, equiv
+from pythomata_wrapper import to_pythomata_dfa
 from trie import Trie
 from languages import Language
 from create_plot import create_plot
@@ -88,6 +90,7 @@ def cosine_merging(dfa, states, states_mask, threshold):
 #     return from_pythomata_dfa(min_dfa)
 
 init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
+n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
 n_train = range(args.n_train_low, args.n_train_high)
 tokenizer = Tokenizer()
 lang = Language.from_string(args.lang)
@@ -164,6 +167,10 @@ for seed in range(args.seeds):
         _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
         init_dev_acc[seed].append(_acc)
 
+        merge_pdfa = to_pythomata_dfa(merge_dfa)
+        min_pdfa = merge_pdfa.minimize().trim()
+        n_merged_states[seed].append(len(merge_pdfa.states))
+        n_min_states[seed].append(len(min_pdfa.states))
         # if n > 40:
         #     print("Yo got to stuff")
         #     pdfa = to_pythomata_dfa(merge_dfa)

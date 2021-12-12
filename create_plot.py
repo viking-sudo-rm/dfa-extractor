@@ -37,6 +37,7 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
     else:
         title = f"{lang}, threshold = {str(threshold)}, {epoch}, eval = {eval}"
     plt.title(title)
+    plt.tight_layout()
     ax.legend()
     plotname = f"./images/acc-{lang}-{str(threshold)}-{epoch}-{eval}.pdf"
     print(f"Saved {plotname}")
