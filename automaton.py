@@ -6,7 +6,7 @@ class Dfa:
     A basic class that represents a deterministic finite automaton.
     """
 
-    def __init__(self, id = 0, states = [], arcs = []):
+    def __init__(self, id = 0, states = [], arcs = [], init_state=0):
         """
         Expects an identifier (used for figure creation), a list of states in the
         form of tuples (n, is_final_state), and a list of tuples (state1, symbols, state2)
@@ -15,7 +15,7 @@ class Dfa:
 
         self.table = {}
         self.final = {}
-        self.init_state = 0
+        self.init_state = init_state
         self.id = id
         for v in states:
             self.table[v[0]] = []

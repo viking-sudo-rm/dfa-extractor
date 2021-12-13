@@ -37,6 +37,12 @@ def get_metrics(args, lang_name: str):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lang = Language.from_string(lang_name)
     tokenizer = Tokenizer()
+    model_dir = os.path.join("models", args.lang)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    token_path = os.path.join(model_dir, "tokenizer.pkl")
+    tokenizer = np.load(token_path)
+    
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
     lang_dir = os.path.join("models", lang_name)
@@ -96,7 +102,7 @@ def get_metrics(args, lang_name: str):
             merge_train_acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
             init_dev_acc = score_whole_words(init_dfa, dev_sents, dev_gold)
             merge_dev_acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
-            
+
             metrics["init_train_acc"][seed].append(init_train_acc.item())
             metrics["merge_train_acc"][seed].append(merge_train_acc.item())
             metrics["init_dev_acc"][seed].append(init_dev_acc.item())
@@ -174,5 +180,5 @@ for mname in ["min_n_states", "merge_n_states"]:
         medians = torch.quantile(values, q=.5, dim=0)
         min_n, idx = torch.min(medians, dim=0)
         min_n = min_n.int().item()
-        epoch = ckpt_ids[lang][idx.item()] 
+        epoch = ckpt_ids[lang][idx.item()]
         print(f"{lang} = {min_n} @ e{epoch}")
