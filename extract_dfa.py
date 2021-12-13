@@ -33,7 +33,6 @@ def parse_args():
     parser.add_argument("--no_state_count", action="store_true")
     return parser.parse_args()
 
-args = parse_args()
 
 def score_whole_words(dfa, dataset, labels):
     acc = 0
@@ -90,90 +89,92 @@ def cosine_merging(dfa, states, states_mask, threshold):
 #     min_dfa = nfa.determinize().minimize().trim()
 #     return from_pythomata_dfa(min_dfa)
 
-init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
-n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
-n_train = range(args.n_train_low, args.n_train_high)
-tokenizer = Tokenizer()
-lang = Language.from_string(args.lang)
-sampler = BalancedSampler(lang)
-dev_sampler = TestSampler(lang)
-if lang is None:
-    raise NotImplementedError("Non implemented language.")
+if __name__ == "__main__":
+    args = parse_args()
+    init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
+    n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
+    n_train = range(args.n_train_low, args.n_train_high)
+    tokenizer = Tokenizer()
+    lang = Language.from_string(args.lang)
+    sampler = BalancedSampler(lang)
+    dev_sampler = TestSampler(lang)
+    if lang is None:
+        raise NotImplementedError("Non implemented language.")
 
-for seed in range(args.seeds):
-    random.seed(seed)
-    init_train_acc[seed], init_dev_acc[seed], train_acc[seed], dev_acc[seed] = [], [], [], []
-    for n in n_train:
-        # n train and 1000 dev samples of length 10 and 50, respectively
-        train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
-        # print(train_sents)
-        dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
-        dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
+    for seed in range(args.seeds):
+        random.seed(seed)
+        init_train_acc[seed], init_dev_acc[seed], train_acc[seed], dev_acc[seed] = [], [], [], []
+        for n in n_train:
+            # n train and 1000 dev samples of length 10 and 50, respectively
+            train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
+            # print(train_sents)
+            dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
+            dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
-        # Define the neural net and get predictions on the train/dev set
-        trained_model = Tagger(tokenizer.n_tokens, 10, 100)
-        filename = f"./models/{args.lang}/{args.epoch}.th"
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        trained_model.load_state_dict(torch.load(filename, map_location=device))
-        with torch.no_grad():
-            train_results = trained_model(train_tokens, train_labels, train_mask)
-            dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
-        train_preds = train_results["predictions"]
-        _dev_preds = dev_results["predictions"]
-        dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
+            # Define the neural net and get predictions on the train/dev set
+            trained_model = Tagger(tokenizer.n_tokens, 10, 100)
+            filename = f"./models/{args.lang}/{args.epoch}.th"
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            trained_model.load_state_dict(torch.load(filename, map_location=device))
+            with torch.no_grad():
+                train_results = trained_model(train_tokens, train_labels, train_mask)
+                dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
+            train_preds = train_results["predictions"]
+            _dev_preds = dev_results["predictions"]
+            dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
 
-        # Can either use preds or labels here, depending on what we want to evaluate
-        # TODO: Maybe plot both on the same graph?
-        if (args.eval == "preds"):
-            train_gold = train_preds
-            dev_gold = dev_preds
-        elif (args.eval == "labels"):
-            train_gold = train_labels
-            dev_gold = dev_labels
-        else:
-            raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
+            # Can either use preds or labels here, depending on what we want to evaluate
+            # TODO: Maybe plot both on the same graph?
+            if (args.eval == "preds"):
+                train_gold = train_preds
+                dev_gold = dev_preds
+            elif (args.eval == "labels"):
+                train_gold = train_labels
+                dev_gold = dev_labels
+            else:
+                raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
-        # Define the maximal dfa-trie
-        redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_gold) # build the trie based on train_gold
-        assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
+            # Define the maximal dfa-trie
+            redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_gold) # build the trie based on train_gold
+            assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
 
-        # Obtain representations
-        representations = train_results["states"]
-        idx = [redundant_dfa.return_states(sent) for sent in train_sents]
-        n_states = len(redundant_dfa.table.keys())
-        states = torch.empty((n_states, 100))
-        states_mask = torch.empty((n_states), dtype=torch.long)
-        for i, _r in enumerate(representations):
-            states[idx[i]] = _r[train_mask[i]]
-            states_mask[idx[i]] = train_labels[i][train_mask[i]]
+            # Obtain representations
+            representations = train_results["states"]
+            idx = [redundant_dfa.return_states(sent) for sent in train_sents]
+            n_states = len(redundant_dfa.table.keys())
+            states = torch.empty((n_states, 100))
+            states_mask = torch.empty((n_states), dtype=torch.long)
+            for i, _r in enumerate(representations):
+                states[idx[i]] = _r[train_mask[i]]
+                states_mask[idx[i]] = train_labels[i][train_mask[i]]
 
-        # Merge states
-        init_dfa = deepcopy(redundant_dfa)
-        merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
-        # The minimization is suuuper slow :(, probably because there is determinization first.
-        # min_dfa = minimize(merge_dfa)
+            # Merge states
+            init_dfa = deepcopy(redundant_dfa)
+            merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
+            # The minimization is suuuper slow :(, probably because there is determinization first.
+            # min_dfa = minimize(merge_dfa)
 
-        if (args.fst):
-            init_dfa.make_graph()
-            merge_dfa.make_graph()
+            if (args.fst):
+                init_dfa.make_graph()
+                merge_dfa.make_graph()
 
-        # Evaluate performance
-        _acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
-        train_acc[seed].append(_acc)
-        _acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
-        dev_acc[seed].append(_acc)
+            # Evaluate performance
+            _acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
+            train_acc[seed].append(_acc)
+            _acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
+            dev_acc[seed].append(_acc)
 
-        _acc = score_all_prefixes(init_dfa, train_sents, train_gold)
-        init_train_acc[seed].append(_acc)
-        _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
-        init_dev_acc[seed].append(_acc)
+            _acc = score_all_prefixes(init_dfa, train_sents, train_gold)
+            init_train_acc[seed].append(_acc)
+            _acc = score_whole_words(init_dfa, dev_sents, dev_gold) # valid for TestSampler
+            init_dev_acc[seed].append(_acc)
 
-        if not args.no_state_count:
-            merge_pdfa = to_pythomata_dfa(merge_dfa)
-            min_pdfa = merge_pdfa.minimize().trim()
-            n_merged_states[seed].append(len(merge_pdfa.states))
-            n_min_states[seed].append(len(min_pdfa.states))
+            if not args.no_state_count:
+                merge_pdfa = to_pythomata_dfa(merge_dfa)
+                min_pdfa = merge_pdfa.minimize().trim()
+                n_merged_states[seed].append(len(merge_pdfa.states))
+                n_min_states[seed].append(len(min_pdfa.states))
 
 
-# Create plot for accuracy vs #data
-create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)
+    # Create plot for accuracy vs #data
+    create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)
