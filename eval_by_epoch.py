@@ -37,6 +37,12 @@ def get_metrics(args, lang_name: str):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lang = Language.from_string(lang_name)
     tokenizer = Tokenizer()
+    model_dir = os.path.join("models", args.lang)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    token_path = os.path.join(model_dir, "tokenizer.pkl")
+    tokenizer = np.load(token_path)
+    
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
     lang_dir = os.path.join("models", lang_name)
@@ -174,5 +180,5 @@ for mname in ["min_n_states", "merge_n_states"]:
         medians = torch.quantile(values, q=.5, dim=0)
         min_n, idx = torch.min(medians, dim=0)
         min_n = min_n.int().item()
-        epoch = ckpt_ids[lang][idx.item()] 
+        epoch = ckpt_ids[lang][idx.item()]
         print(f"{lang} = {min_n} @ e{epoch}")
