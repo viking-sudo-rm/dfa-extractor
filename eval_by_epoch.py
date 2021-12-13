@@ -164,3 +164,15 @@ for name, nice_name in nice_names.items():
     plt.legend()
     filename = f"{name}-{args.n_train}.pdf"
     plt.savefig(os.path.join(by_epoch_dir, filename))
+
+
+for mname in ["min_n_states", "merge_n_states"]:
+    print("=" * 3, mname, "=" * 3)
+    for lang, metrics in tomita_metrics.items():
+        n_states = metrics[mname]
+        values = torch.tensor(list(n_states.values()), dtype=torch.float)
+        medians = torch.quantile(values, q=.5, dim=0)
+        min_n, idx = torch.min(medians, dim=0)
+        min_n = min_n.int().item()
+        epoch = ckpt_ids[lang][idx.item()] 
+        print(f"{lang} = {min_n} @ e{epoch}")
