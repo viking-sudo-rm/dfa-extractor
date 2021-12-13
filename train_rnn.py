@@ -37,15 +37,6 @@ if lang is None:
 random.seed(args.seed)
 torch.random.manual_seed(args.seed)
 
-model_dir = os.path.join("models", args.lang)
-if not os.path.exists(model_dir):
-    os.makedirs(model_dir)
-token_path = os.path.join(model_dir, "tokenizer.pkl")
-with open(token_path, "wb") as fh:
-    pickle.dump(tokenizer, fh)
-if args.only_tokenize:
-    quit()
-
 print("Generating dataset...")
 train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.train_length)
 dev_tokens, dev_labels, dev_mask, dev_sents = get_data(sampler, lang, tokenizer, args.n_dev, args.dev_length)
@@ -55,6 +46,15 @@ print("tokens", train_tokens[3, :10])
 print("labels", train_labels[3, :10])
 print("mask  ", train_mask[3, :10].bool())
 print("ntoken", tokenizer.n_tokens)
+
+model_dir = os.path.join("models", args.lang)
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+token_path = os.path.join(model_dir, "tokenizer.pkl")
+with open(token_path, "wb") as fh:
+    pickle.dump(tokenizer, fh)
+if args.only_tokenize:
+    quit()
 
 model = Tagger(tokenizer.n_tokens, 10, 100)
 if use_gpu:
