@@ -3,6 +3,7 @@ from tqdm import trange
 import argparse
 import random
 import os
+import pickle
 
 from languages import Language
 from utils import Tokenizer, get_data
@@ -22,6 +23,7 @@ def parse_args():
     parser.add_argument("--dev_length", type=int, default=200)
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--device", type=int, default=0)
+    parser.add_argument("--only_tokenize", action="store_true")
     return parser.parse_args()
 
 args = parse_args()
@@ -34,6 +36,15 @@ if lang is None:
 
 random.seed(args.seed)
 torch.random.manual_seed(args.seed)
+
+model_dir = os.path.join("models", args.lang)
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+token_path = os.path.join(model_dir, "tokenizer.pkl")
+with open(token_path, "wb") as fh:
+    pickle.dump(tokenizer, fh)
+if args.only_tokenize:
+    quit()
 
 print("Generating dataset...")
 train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.train_length)
@@ -54,9 +65,6 @@ optim = torch.optim.AdamW(model.parameters())
 best_acc = 0.
 best_epoch = -1
 
-model_dir = os.path.join("models", args.lang)
-if not os.path.exists(model_dir):
-    os.makedirs(model_dir)
 saved_epochs = []
 
 for epoch in range(args.n_epochs):
