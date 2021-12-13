@@ -96,7 +96,7 @@ def get_metrics(args, lang_name: str):
             merge_train_acc = score_all_prefixes(merge_dfa, train_sents, train_gold)
             init_dev_acc = score_whole_words(init_dfa, dev_sents, dev_gold)
             merge_dev_acc = score_whole_words(merge_dfa, dev_sents, dev_gold) # valid for TestSampler
-            
+
             metrics["init_train_acc"][seed].append(init_train_acc.item())
             metrics["merge_train_acc"][seed].append(merge_train_acc.item())
             metrics["init_dev_acc"][seed].append(init_dev_acc.item())

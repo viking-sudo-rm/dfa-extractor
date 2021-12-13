@@ -12,7 +12,7 @@ from create_plot import create_plot
 from models import Tagger
 from utils import get_data, Tokenizer
 from sampling import BalancedSampler, TestSampler
-# from pythomata_wrapper import to_pythomata_nfa, to_pythomata_dfa, from_pythomata_dfa
+from pythomata_wrapper import to_pythomata_nfa, to_pythomata_dfa, from_pythomata_dfa
 
 
 def parse_args():
@@ -107,7 +107,6 @@ if __name__ == "__main__":
         for n in n_train:
             # n train and 1000 dev samples of length 10 and 50, respectively
             train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n, 10)
-            # print(train_sents)
             dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
             dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))] # valid for TestSampler
 
@@ -153,6 +152,11 @@ if __name__ == "__main__":
             merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
             # The minimization is suuuper slow :(, probably because there is determinization first.
             # min_dfa = minimize(merge_dfa)
+            merge_pdfa = to_pythomata_dfa(merge_dfa)
+            min_pdfa = merge_pdfa.minimize().trim()
+            min_pdfa = min_pdfa.minimize().trim()
+            min_dfa = from_pythomata_dfa(min_pdfa)
+            merge_dfa = min_dfa
 
             if (args.fst):
                 init_dfa.make_graph()

@@ -48,4 +48,4 @@ def from_pythomata_dfa(auto: Union[SimpleDFA, SimpleNFA]) -> Dfa:
             for token, new_states in mapping.items():
                 for new_state in new_states:
                     arcs.append((state, token, new_state))
-    return Dfa(auto.initial_state, states, arcs)
+    return Dfa('pmin', states, arcs, auto.initial_state)
