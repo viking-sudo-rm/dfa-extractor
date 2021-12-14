@@ -3,6 +3,9 @@ import argparse
 from copy import deepcopy
 import random
 from collections import defaultdict
+import os
+import pickle
+import numpy as np
 
 from automaton import Dfa, equiv
 from pythomata_wrapper import to_pythomata_dfa
@@ -23,14 +26,13 @@ def parse_args():
     parser.add_argument("--sim_threshold", type=float, default=.99)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--fst", dest='fst', action='store_true')
-    parser.add_argument("--no-fst", dest='fst', action='store_false')
     parser.set_defaults(fst=False)
     parser.add_argument('--minimize', dest='min', action='store_true')
-    parser.add_argument('--no-minimize', dest='min', action='store_false')
     parser.set_defaults(min=False)
     parser.add_argument('--epoch', type=str, default="best")
     parser.add_argument('--eval', type=str, default="preds")
     parser.add_argument("--no_state_count", action="store_true")
+    parser.add_argument("--table", action="store_true")
     return parser.parse_args()
 
 
@@ -84,17 +86,15 @@ def cosine_merging(dfa, states, states_mask, threshold):
 
     return dfa
 
-# def minimize(auto: Dfa) -> Dfa:
-#     nfa = to_pythomata_nfa(auto)
-#     min_dfa = nfa.determinize().minimize().trim()
-#     return from_pythomata_dfa(min_dfa)
-
 if __name__ == "__main__":
     args = parse_args()
     init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
     n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
     n_train = range(args.n_train_low, args.n_train_high)
     tokenizer = Tokenizer()
+    tfilename = os.path.join("models", args.lang, "tokenizer.pkl")
+    with open(tfilename, "rb") as fh:
+        tokenizer = pickle.load(fh)
     lang = Language.from_string(args.lang)
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
@@ -123,7 +123,6 @@ if __name__ == "__main__":
             dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
 
             # Can either use preds or labels here, depending on what we want to evaluate
-            # TODO: Maybe plot both on the same graph?
             if (args.eval == "preds"):
                 train_gold = train_preds
                 dev_gold = dev_preds
@@ -134,7 +133,7 @@ if __name__ == "__main__":
                 raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
             # Define the maximal dfa-trie
-            redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_gold) # build the trie based on train_gold
+            redundant_dfa = build_dfa_from_dict(id=args.lang+str(args.sim_threshold), dict=train_sents, labels=train_gold) # build the trie based on train_gold
             assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
 
             # Obtain representations
@@ -150,13 +149,13 @@ if __name__ == "__main__":
             # Merge states
             init_dfa = deepcopy(redundant_dfa)
             merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
-            # The minimization is suuuper slow :(, probably because there is determinization first.
-            # min_dfa = minimize(merge_dfa)
-            merge_pdfa = to_pythomata_dfa(merge_dfa)
-            min_pdfa = merge_pdfa.minimize().trim()
-            min_pdfa = min_pdfa.minimize().trim()
-            min_dfa = from_pythomata_dfa(min_pdfa)
-            merge_dfa = min_dfa
+
+            if (args.min):
+                merge_pdfa = to_pythomata_dfa(merge_dfa)
+                min_pdfa = merge_pdfa.minimize().trim()
+                min_pdfa = min_pdfa.minimize().trim()
+                min_dfa = from_pythomata_dfa(min_pdfa)
+                merge_dfa = min_dfa
 
             if (args.fst):
                 init_dfa.make_graph()
@@ -181,4 +180,10 @@ if __name__ == "__main__":
 
 
     # Create plot for accuracy vs #data
+    if (args.table):
+        dev_array = np.array(list(dev_acc.values()))
+        mean_dev_acc = np.average(dev_array, axis=0)
+        std_dev_acc = np.std(dev_array, axis=0)
+        print(f"{args.sim_threshold}--{args.lang}--{mean_dev_acc}--{std_dev_acc}")
+        exit()
     create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)

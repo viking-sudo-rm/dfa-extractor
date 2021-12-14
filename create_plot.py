@@ -42,4 +42,4 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
     plotname = f"./images/acc-{lang}-{str(threshold)}-{epoch}-{eval}.pdf"
     print(f"Saved {plotname}")
     plt.savefig(plotname)
-    # plt.show()
+    plt.show()
