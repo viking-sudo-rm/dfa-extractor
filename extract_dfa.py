@@ -3,6 +3,9 @@ import argparse
 from copy import deepcopy
 import random
 from collections import defaultdict
+import os
+import pickle
+import numpy as np
 
 from automaton import Dfa, equiv
 from pythomata_wrapper import to_pythomata_dfa
@@ -23,10 +26,8 @@ def parse_args():
     parser.add_argument("--sim_threshold", type=float, default=.99)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--fst", dest='fst', action='store_true')
-    parser.add_argument("--no-fst", dest='fst', action='store_false')
     parser.set_defaults(fst=False)
     parser.add_argument('--minimize', dest='min', action='store_true')
-    parser.add_argument('--no-minimize', dest='min', action='store_false')
     parser.set_defaults(min=False)
     parser.add_argument('--epoch', type=str, default="best")
     parser.add_argument('--eval', type=str, default="preds")
@@ -84,17 +85,17 @@ def cosine_merging(dfa, states, states_mask, threshold):
 
     return dfa
 
-# def minimize(auto: Dfa) -> Dfa:
-#     nfa = to_pythomata_nfa(auto)
-#     min_dfa = nfa.determinize().minimize().trim()
-#     return from_pythomata_dfa(min_dfa)
-
 if __name__ == "__main__":
     args = parse_args()
     init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
     n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
     n_train = range(args.n_train_low, args.n_train_high)
     tokenizer = Tokenizer()
+    model_dir = os.path.join("models", args.lang)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    token_path = os.path.join(model_dir, "tokenizer.pkl")
+    tokenizer = np.load(token_path, allow_pickle=True)
     lang = Language.from_string(args.lang)
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
@@ -123,7 +124,6 @@ if __name__ == "__main__":
             dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
 
             # Can either use preds or labels here, depending on what we want to evaluate
-            # TODO: Maybe plot both on the same graph?
             if (args.eval == "preds"):
                 train_gold = train_preds
                 dev_gold = dev_preds
@@ -150,13 +150,13 @@ if __name__ == "__main__":
             # Merge states
             init_dfa = deepcopy(redundant_dfa)
             merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
-            # The minimization is suuuper slow :(, probably because there is determinization first.
-            # min_dfa = minimize(merge_dfa)
-            merge_pdfa = to_pythomata_dfa(merge_dfa)
-            min_pdfa = merge_pdfa.minimize().trim()
-            min_pdfa = min_pdfa.minimize().trim()
-            min_dfa = from_pythomata_dfa(min_pdfa)
-            merge_dfa = min_dfa
+
+            if (args.min):
+                merge_pdfa = to_pythomata_dfa(merge_dfa)
+                min_pdfa = merge_pdfa.minimize().trim()
+                min_pdfa = min_pdfa.minimize().trim()
+                min_dfa = from_pythomata_dfa(min_pdfa)
+                merge_dfa = min_dfa
 
             if (args.fst):
                 init_dfa.make_graph()
