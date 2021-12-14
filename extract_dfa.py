@@ -91,11 +91,9 @@ if __name__ == "__main__":
     n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
     n_train = range(args.n_train_low, args.n_train_high)
     tokenizer = Tokenizer()
-    model_dir = os.path.join("models", args.lang)
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    token_path = os.path.join(model_dir, "tokenizer.pkl")
-    tokenizer = np.load(token_path, allow_pickle=True)
+    tfilename = os.path.join("models", args.lang, "tokenizer.pkl")
+    with open(tfilename, "rb") as fh:
+        tokenizer = pickle.load(fh)
     lang = Language.from_string(args.lang)
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
