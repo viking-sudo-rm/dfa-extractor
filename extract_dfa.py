@@ -32,6 +32,7 @@ def parse_args():
     parser.add_argument('--epoch', type=str, default="best")
     parser.add_argument('--eval', type=str, default="preds")
     parser.add_argument("--no_state_count", action="store_true")
+    parser.add_argument("--table", action="store_true")
     return parser.parse_args()
 
 
@@ -90,18 +91,10 @@ if __name__ == "__main__":
     init_train_acc, init_dev_acc, train_acc, dev_acc = {}, {}, {}, {}
     n_merged_states, n_min_states = defaultdict(list), defaultdict(list)
     n_train = range(args.n_train_low, args.n_train_high)
-<<<<<<< HEAD
     tokenizer = Tokenizer()
     tfilename = os.path.join("models", args.lang, "tokenizer.pkl")
     with open(tfilename, "rb") as fh:
         tokenizer = pickle.load(fh)
-=======
-    model_dir = os.path.join("models", args.lang)
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    token_path = os.path.join(model_dir, "tokenizer.pkl")
-    tokenizer = np.load(token_path, allow_pickle=True)
->>>>>>> ae997b44656106dbe4730396bb1a2b3b855c6ce5
     lang = Language.from_string(args.lang)
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
@@ -140,7 +133,7 @@ if __name__ == "__main__":
                 raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
             # Define the maximal dfa-trie
-            redundant_dfa = build_dfa_from_dict(id=args.lang, dict=train_sents, labels=train_gold) # build the trie based on train_gold
+            redundant_dfa = build_dfa_from_dict(id=args.lang+str(args.sim_threshold), dict=train_sents, labels=train_gold) # build the trie based on train_gold
             assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
 
             # Obtain representations
@@ -187,4 +180,10 @@ if __name__ == "__main__":
 
 
     # Create plot for accuracy vs #data
+    if (args.table):
+        dev_array = np.array(list(dev_acc.values()))
+        mean_dev_acc = np.average(dev_array, axis=0)
+        std_dev_acc = np.std(dev_array, axis=0)
+        print(f"{args.sim_threshold}--{args.lang}--{mean_dev_acc}--{std_dev_acc}")
+        exit()
     create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)
