@@ -224,3 +224,9 @@ def tiny_value_of_dtype(dtype: torch.dtype):
         return 1e-4
     else:
         raise TypeError("Does not support dtype " + str(dtype))
+
+
+def get_norm(model: torch.nn.Module) -> torch.Tensor:
+    """Get the 2-norm of the parameters in a model."""
+    params = torch.cat([p.flatten() for p in model.parameters()])
+    return params.norm(p=2)

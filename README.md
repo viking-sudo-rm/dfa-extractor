@@ -23,3 +23,8 @@ To extract a DFA from an RNN, and create a plot of accuracy vs number of data in
 ```shell
 python extract_dfa.py --lang=Tom6 --n_train_low=2 --n_train_high=20
 ```
+
+To train an RNN for 100 epochs and save all checkpoints:
+```shell
+python train_rnn.py --save_name=Tom7-100 --lang=Tom7 --save_all --n_epochs=100 --stop_threshold=1000
+```

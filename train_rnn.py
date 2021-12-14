@@ -4,9 +4,10 @@ import argparse
 import random
 import os
 import pickle
+from collections import defaultdict
 
 from languages import Language
-from utils import Tokenizer, get_data
+from utils import Tokenizer, get_data, get_norm
 from models import Tagger
 from sampling import BalancedSampler
 
@@ -24,6 +25,8 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--device", type=int, default=0)
     parser.add_argument("--only_tokenize", action="store_true")
+    parser.add_argument("--save_name", type=str, default=None)
+    parser.add_argument("--save_all", action="store_true")
     return parser.parse_args()
 
 args = parse_args()
@@ -47,7 +50,8 @@ print("labels", train_labels[3, :10])
 print("mask  ", train_mask[3, :10].bool())
 print("ntoken", tokenizer.n_tokens)
 
-model_dir = os.path.join("models", args.lang)
+save_name = args.save_name if args.save_name is not None else args.lang
+model_dir = os.path.join("models", save_name)
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 token_path = os.path.join(model_dir, "tokenizer.pkl")
@@ -66,6 +70,7 @@ best_acc = 0.
 best_epoch = -1
 
 saved_epochs = []
+metrics = defaultdict(list)
 
 for epoch in range(args.n_epochs):
     print(f"Starting epoch {epoch}...")
@@ -94,27 +99,39 @@ for epoch in range(args.n_epochs):
             dev_labels = dev_labels.cuda(args.device)
             dev_mask = dev_mask.cuda(args.device)
         dev_output_dict = model(dev_tokens, dev_labels, dev_mask)
-        acc = dev_output_dict["accuracy"]
-        print("Dev acc:", acc.item())
+        metrics["loss"] = dev_output_dict["loss"].item()
+        metrics["accuracy"] = dev_output_dict["accuracy"].item()
+        metrics["norm"] = get_norm(model.rnn).item()
+        print("=== Dev metrics ===")
+        print("\tacc =", metrics["accuracy"])
+        print("\tloss =", metrics["loss"])
+        print("\tnorm =", metrics["norm"])
+        acc = metrics["accuracy"]
 
     if acc > best_acc:
         best_acc = acc
         best_epoch = epoch
 
-    if acc >= best_acc:
+    if args.save_all or acc >= best_acc:
         best_path = os.path.join(model_dir, "best.th")
         torch.save(model.state_dict(), best_path)
         epoch_path = os.path.join(model_dir, f"epoch{epoch}.th")
         torch.save(model.state_dict(), epoch_path)
         saved_epochs.append(epoch)
-        print(f"Best model! Saved")
+        print(f"Saved checkpoint!")
 
     if epoch - best_epoch > args.stop_threshold:
         print("Stopped early!")
         break
 
+print("Saving metrics dict...")
+metrics_path = os.path.join(model_dir, "metrics.pkl")
+with open(metrics_path, "wb") as fh:
+    pickle.dump(metrics, fh)
+
 print("Cleaning up sub-optimal checkpoints...")
-for epoch in saved_epochs:
-    if epoch < best_epoch:
-        epoch_path = os.path.join(model_dir, f"epoch{epoch}.th")
-        os.remove(epoch_path)
+if not args.save_all:
+    for epoch in saved_epochs:
+        if epoch < best_epoch:
+            epoch_path = os.path.join(model_dir, f"epoch{epoch}.th")
+            os.remove(epoch_path)

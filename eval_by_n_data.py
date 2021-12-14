@@ -1,3 +1,5 @@
+"""Vary the number of data, and evaluate the extraction across all Tomita languages."""
+
 from copy import deepcopy
 import os
 import re
@@ -8,6 +10,7 @@ import matplotlib.pyplot as plt
 import pickle
 import tqdm
 import random
+import numpy as np
 
 from languages import Language
 from utils import Tokenizer, get_data
@@ -19,8 +22,9 @@ from pythomata_wrapper import to_pythomata_dfa
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--lang", type=str, default=None)
-    parser.add_argument("--n_train", type=int, default=100)
+    parser.add_argument("--n_train_min", type=int, default=5)
+    parser.add_argument("--n_train_max", type=int, default=500)
+    parser.add_argument("--n_train_steps", type=int, default=20)
     parser.add_argument("--eval", choices=["preds", "labels"], default="preds")
     parser.add_argument("--sim_threshold", type=float, default=.99)
     parser.add_argument("--load", action="store_true")
@@ -36,7 +40,7 @@ def set_seed(seed: int):
 
 def get_metrics(args, lang_name: str):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    lang = Language.from_string(lang_name.split("-")[0])  # Remove any clarifying suffixes
+    lang = Language.from_string(lang_name)
     lang_dir = os.path.join("models", lang_name)
     token_path = os.path.join(lang_dir, "tokenizer.pkl")
     with open(token_path, "rb") as fh:
@@ -44,20 +48,15 @@ def get_metrics(args, lang_name: str):
     
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
-    ckpts = [s for s in os.listdir(lang_dir) if re.match(r"epoch[0-9]+\.th", s)]
-    ckpt_ids = [int(re.match(r"epoch([0-9]+)\.th", s)[1]) for s in ckpts]
-    pairs = list(zip(ckpts, ckpt_ids))
-    pairs.sort(key=lambda pair: pair[1])
-    ckpts, ckpt_ids = zip(*pairs)
-    print("Got checkpoints:", ckpt_ids)
+    path = os.path.join(lang_dir, "best.th")
 
     # Default dict of default dict of lists
+    n_datas = np.linspace(args.n_train_min, args.n_train_max, args.n_train_steps).astype(np.int)
     metrics = defaultdict(lambda: defaultdict(list))
-    for ckpt in tqdm.tqdm(ckpts):
-        path = os.path.join(lang_dir, ckpt)
+    for n_data in tqdm.tqdm(n_datas):
         for seed in range(args.n_seeds):
             set_seed(seed)
-            train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.len_train)
+            train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n_data, 10)
             dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
             dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))]
             trained_model = Tagger(tokenizer.n_tokens, 10, 100)
@@ -110,8 +109,32 @@ def get_metrics(args, lang_name: str):
             metrics["min_n_states"][seed].append(len(min_pdfa.states))
 
     metrics = {k: dict(d) for k, d in metrics.items()}
-    return ckpt_ids, metrics
+    return n_datas, metrics
 
+args = parse_args()
+tomita_metrics_file = f"cached/tomita_metrics-best-{args.n_train_max}-{args.len_train}-{args.n_train_steps}.pkl"
+n_train_file = f"cached/n_train-{args.n_train_max}-{args.len_train}-{args.n_train_steps}.pkl"
+
+if args.load:
+    with open(tomita_metrics_file, "rb") as fh:
+        tomita_metrics = pickle.load(fh)
+    with open(n_train_file, "rb") as fh:
+        n_train = pickle.load(fh)
+else:
+    # Can modify this line to only do some of the Tomita languages.
+    lang_names = [f"Tom{i}" for i in range(1, 8)]
+    tomita_metrics = {}
+    n_train = {}
+    for idx in range(1, 8):
+        lang_name = f"Tom{idx}"
+        print(f"Starting {lang_name}...")
+        ckpt_ids_, metrics = get_metrics(args, lang_name)
+        n_train[lang_name] = ckpt_ids_
+        tomita_metrics[lang_name] = metrics
+    with open(tomita_metrics_file, "wb") as fh:
+        pickle.dump(tomita_metrics, fh)
+    with open(n_train_file, "wb") as fh:
+        pickle.dump(n_train, fh)
 
 nice_names = {
     "init_train_acc": "dev acc of prefix tree",
@@ -124,107 +147,36 @@ nice_names = {
 
 colors = ["blue", "green", "red", "cyan", "magenta", "yellow", "black"]
 
-by_epoch_dir = "images/by-epoch"
+by_data_dir = "images/by-data"
+if not os.path.isdir(by_data_dir):
+    os.makedirs(by_data_dir)
 
-
-def run_for_lang(args):
-    tomita_metrics_file = f"cached/tomita_metrics-{args.n_train}-{args.len_train}-{args.lang}.pkl"
-    ckpt_ids_file = f"cached/ckpt_ids-{args.lang}.pkl"
-    if args.load:
-        with open(tomita_metrics_file, "rb") as fh:
-            metrics = pickle.load(fh)
-        with open(ckpt_ids_file, "rb") as fh:
-            ckpt_ids = pickle.load(fh)
-    else:
-        ckpt_ids, metrics = get_metrics(args, args.lang)
-        with open(tomita_metrics_file, "wb") as fh:
-            pickle.dump(metrics, fh)
-        with open(ckpt_ids_file, "wb") as fh:
-            pickle.dump(ckpt_ids, fh)
-
-    if not os.path.isdir(by_epoch_dir):
-        os.makedirs(by_epoch_dir)
-
-    for name, nice_name in nice_names.items():
-        plt.figure()
-        plt.xlabel("#epochs")
-        plt.ylabel(nice_name)
-        plt.tight_layout()
-        ids = ckpt_ids
-        color = "blue"
-        lang_name = args.lang
+for name, nice_name in nice_names.items():
+    plt.figure()
+    plt.xlabel("#data")
+    plt.ylabel(nice_name)
+    plt.tight_layout()
+    for color, (lang_name, metrics) in zip(colors, tomita_metrics.items()):
+        ids = n_train[lang_name]
         values = torch.tensor(list(metrics[name].values()), dtype=torch.float)
         mids = torch.quantile(values, q=.5, dim=0)
         lows = torch.quantile(values, q=.25, dim=0)
         highs = torch.quantile(values, q=.75, dim=0)
         plt.fill_between(ids, lows, highs, alpha=.2, color=color)
         plt.plot(ids, mids, label=lang_name, color=color, linestyle="-", marker=".")
-        plt.legend()
-        plt.title(f"{nice_name} ({args.n_train} train points)")
-        filename = f"{name}-{args.n_train}-{args.lang}.pdf"
-        plt.savefig(os.path.join(by_epoch_dir, filename))
+    plt.legend()
+    plt.title(f"{nice_name}")
+    filename = f"{name}-{args.n_train_max}-{args.len_train}-{args.n_train_steps}.pdf"
+    plt.savefig(os.path.join(by_data_dir, filename))
 
 
-def run_for_all_langs(args):
-    tomita_metrics_file = f"cached/tomita_metrics-{args.n_train}-{args.len_train}.pkl"
-    ckpt_ids_file = f"cached/ckpt_ids.pkl"
-    if args.load:
-        with open(tomita_metrics_file, "rb") as fh:
-            tomita_metrics = pickle.load(fh)
-        with open(ckpt_ids_file, "rb") as fh:
-            ckpt_ids = pickle.load(fh)
-    else:
-        # Can modify this line to only do some of the Tomita languages.
-        tomita_metrics = {}
-        ckpt_ids = {}
-        for idx in range(1, 8):
-            lang_name = f"Tom{idx}"
-            print(f"Starting {lang_name}...")
-            ckpt_ids_, metrics = get_metrics(args, lang_name)
-            ckpt_ids[lang_name] = ckpt_ids_
-            tomita_metrics[lang_name] = metrics
-        with open(tomita_metrics_file, "wb") as fh:
-            pickle.dump(tomita_metrics, fh)
-        with open(ckpt_ids_file, "wb") as fh:
-            pickle.dump(ckpt_ids, fh)
-
-    if not os.path.isdir(by_epoch_dir):
-        os.makedirs(by_epoch_dir)
-
-    for name, nice_name in nice_names.items():
-        plt.figure()
-        plt.xlabel("#epochs")
-        plt.ylabel(nice_name)
-        plt.tight_layout()
-        for color, (lang_name, metrics) in zip(colors, tomita_metrics.items()):
-            ids = ckpt_ids[lang_name]
-            values = torch.tensor(list(metrics[name].values()), dtype=torch.float)
-            mids = torch.quantile(values, q=.5, dim=0)
-            lows = torch.quantile(values, q=.25, dim=0)
-            highs = torch.quantile(values, q=.75, dim=0)
-            plt.fill_between(ids, lows, highs, alpha=.2, color=color)
-            plt.plot(ids, mids, label=lang_name, color=color, linestyle="-", marker=".")
-        plt.legend()
-        plt.title(f"{nice_name} ({args.n_train} train points)")
-        filename = f"{name}-{args.n_train}.pdf"
-        plt.savefig(os.path.join(by_epoch_dir, filename))
-
-    for mname in ["min_n_states", "merge_n_states"]:
-        print("=" * 3, mname, "=" * 3)
-        for lang, metrics in tomita_metrics.items():
-            n_states = metrics[mname]
-            values = torch.tensor(list(n_states.values()), dtype=torch.float)
-            medians = torch.quantile(values, q=.5, dim=0)
-            min_n, idx = torch.min(medians, dim=0)
-            min_n = min_n.int().item()
-            epoch = ckpt_ids[lang][idx.item()]
-            print(f"{lang} = {min_n} @ e{epoch}")
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    if args.lang is not None:
-        print(f"Single language mode for {args.lang}")
-        run_for_lang(args)
-    else:
-        run_for_all_langs(args)
+for mname in ["min_n_states", "merge_n_states"]:
+    print("=" * 3, mname, "=" * 3)
+    for lang, metrics in tomita_metrics.items():
+        n_states = metrics[mname]
+        values = torch.tensor(list(n_states.values()), dtype=torch.float)
+        medians = torch.quantile(values, q=.5, dim=0)
+        min_n, idx = torch.min(medians, dim=0)
+        min_n = values.min().item()
+        epoch = n_train[lang][idx.item()]
+        print(f"{lang} = {min_n} @ d{epoch}")
