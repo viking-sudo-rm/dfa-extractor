@@ -16,7 +16,7 @@ from languages import Language
 from utils import Tokenizer, get_data
 from models import Tagger
 from sampling import BalancedSampler, TestSampler
-from extract_dfa import build_dfa_from_dict, cosine_merging, score_all_prefixes, score_whole_words
+from extract_dfa import build_dfa_from_dict, cosine_merging, score_all_prefixes, score_whole_words, cross_validate
 from pythomata_wrapper import to_pythomata_dfa
 
 
@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--n_seeds", type=int, default=5)
     parser.add_argument("--len_train", type=int, default=10)
+    parser.add_argument("--find_threshold", action="store_true")
     return parser.parse_args()
 
 
@@ -57,22 +58,27 @@ def get_metrics(args, lang_name: str):
         for seed in range(args.n_seeds):
             set_seed(seed)
             train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, n_data, 10)
+            val_tokens, val_labels, val_mask, val_sents = get_data(sampler, lang, tokenizer, 20, 2 * args.len_train)
             dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
             dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))]
             trained_model = Tagger(tokenizer.n_tokens, 10, 100)
             trained_model.load_state_dict(torch.load(path, map_location=device))
             with torch.no_grad():
                 train_results = trained_model(train_tokens, train_labels, train_mask)
+                val_results = trained_model(val_tokens, val_labels, val_mask)
                 dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
             train_preds = train_results["predictions"]
+            val_preds = val_results["predictions"]
             _dev_preds = dev_results["predictions"]
             dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
 
             if (args.eval == "preds"):
                 train_gold = train_preds
+                val_gold = val_preds
                 dev_gold = dev_preds
             elif (args.eval == "labels"):
                 train_gold = train_labels
+                val_gold = val_labels
                 dev_gold = dev_labels
             else:
                 raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
@@ -90,7 +96,14 @@ def get_metrics(args, lang_name: str):
 
             # Merge states
             init_dfa = deepcopy(redundant_dfa)
-            merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
+            if (args.find_threshold):
+                # Merge states based on optimal similarity threshold
+                # (measured by performance on hold out validation set (of length equal to 2 times the training length))
+                merge_dfa, _, _ = cross_validate(.925, 1., redundant_dfa, states, states_mask, val_sents, val_gold)
+                # print(opt_thr, max_dev_acc)
+            else:
+                # Merge states based on fixed similarity threshold
+                merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
             merge_pdfa = to_pythomata_dfa(merge_dfa)
             min_pdfa = merge_pdfa.minimize().trim()
 
