@@ -96,6 +96,7 @@ def cosine_merging(dfa, states, states_mask, threshold):
 def cross_validate(left, right, dfa, states, states_mask, val_sents, val_gold):
 
     max_acc = -1.
+    # we run merging multiple times, and select the best
     for j in np.arange(left, right, .005):
         # cur_threshold = (left + right) / 2
         _dfa = deepcopy(dfa)
