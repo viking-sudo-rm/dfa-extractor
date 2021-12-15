@@ -1,3 +1,4 @@
+from typing import Iterable
 import subprocess
 
 
@@ -39,7 +40,7 @@ class Dfa:
                         self.table[n+1] = [[char, n+1] for char in alphabet]
                     self.table[state].append([char, n+1])
 
-    def accept(self, string):
+    def accept(self, string: Iterable[str]):
         """
         Determines whether the automaton accepts or not a string.
         """

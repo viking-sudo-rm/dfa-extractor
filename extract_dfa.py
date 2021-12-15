@@ -46,12 +46,15 @@ def score_all_prefixes(dfa, dataset, labels):
     # Evaluate the performance of the extracted DFA on the dataset
     count, acc = 0, 0
     for i, word in enumerate(dataset):
-        cur = ''
+        cur = []
+        # cur = ''
         for j, char in enumerate(word):
             acc += (dfa.accept(cur) == labels[i][j])
-            cur += char
+            # cur += char
+            cur.append(char)
             count += 1
-        if (cur != ''):
+        # if (cur != ''):
+        if cur:
             acc += (dfa.accept(cur) == labels[i][j+1]) # complete word
             count += 1
         else:
@@ -66,9 +69,10 @@ def build_dfa_from_dict(id, dict, labels):
     return my_dfa
 
 def cosine_merging(dfa, states, states_mask, threshold):
-
     cos = torch.nn.CosineSimilarity(dim=-1)
-    sim = cos(states[None, :, :], states[:, None, :])
+    # sim = cos(states[None, :, :], states[:, None, :])
+    sim1 = cos(states[None, states_mask, :], states[states_mask, None, :])
+    sim0 = cos(states[None, ~states_mask, :], states[~states_mask, None, :])
 
     total, pruned = 0, 0
     for i in range(states.shape[0]):
@@ -77,7 +81,8 @@ def cosine_merging(dfa, states, states_mask, threshold):
                 continue
             if (states_mask[i] != states_mask[j]):
                 continue
-            if (sim[i, j] > threshold):
+            if (states_mask[i] and sim1[i, j] > threshold) or (not states_mask[i] and sim0[i, j] > threshold):
+            # if (sim[i, j] > threshold):
                 total += 1
                 res = dfa.merge_states(i, j)
                 pruned += 1 - res
