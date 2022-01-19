@@ -11,11 +11,17 @@ from utils import Tokenizer, get_data, get_norm
 from models import Tagger
 from sampling import BalancedSampler
 
+def add_noise(labels, percentage):
+    noise_part = int(percentage * len(labels))
+    temp_labels = ~(labels[:noise_part].bool())
+    labels[:noise_part] = temp_labels.int()
+    return labels
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--stop_threshold", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom2")
     parser.add_argument("--n_train", type=int, default=100000)
@@ -27,6 +33,7 @@ def parse_args():
     parser.add_argument("--only_tokenize", action="store_true")
     parser.add_argument("--save_name", type=str, default=None)
     parser.add_argument("--save_all", action="store_true")
+    parser.add_argument("--noise_percentage", type=float, default=0.)
     return parser.parse_args()
 
 args = parse_args()
@@ -43,6 +50,10 @@ torch.random.manual_seed(args.seed)
 print("Generating dataset...")
 train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.train_length)
 dev_tokens, dev_labels, dev_mask, dev_sents = get_data(sampler, lang, tokenizer, args.n_dev, args.dev_length)
+
+print("clean labels", train_labels[:2, :3])
+train_labels = add_noise(train_labels, args.noise_percentage)
+print("noisy_labels", train_labels[:2, :3])
 
 print("Sample input")
 print("tokens", train_tokens[3, :10])
@@ -64,7 +75,10 @@ model = Tagger(tokenizer.n_tokens, 10, 100)
 if use_gpu:
     print(f"Using CUDA device {args.device}")
     model.cuda(args.device)
-optim = torch.optim.AdamW(model.parameters())
+if (args.lr != None):
+    optim = torch.optim.AdamW(model.parameters(), lr=args.lr)
+else:
+    optim = torch.optim.AdamW(model.parameters())
 
 best_acc = 0.
 best_epoch = -1
@@ -92,6 +106,10 @@ for epoch in range(args.n_epochs):
         loss = output_dict["loss"]
         loss.backward()
         optim.step()
+
+    print("=== Train metrics ===")
+    print("\tacc =", output_dict["accuracy"].item())
+    print("\tloss =", output_dict["loss"].item())
 
     with torch.no_grad():
         if use_gpu:
