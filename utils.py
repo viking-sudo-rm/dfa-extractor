@@ -55,6 +55,10 @@ class Tokenizer:
     @property
     def n_tokens(self):
         return self.next_idx
+    
+    @property
+    def vocab(self):
+        return [tok for tok in self.token_to_index if not tok.startswith("<")]
 
 
 def sequence_cross_entropy_with_logits(
