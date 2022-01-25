@@ -9,6 +9,7 @@ from collections import defaultdict
 from sklearn.cluster import KMeans
 
 from languages import Language
+from pythomata_wrapper import to_pythomata_dfa
 from utils import Tokenizer, get_data
 from sampling import BalancedSampler, TestSampler
 from models import Tagger
@@ -130,7 +131,6 @@ with torch.no_grad():
     extractor = KmeansExtractor(train_tokens, train_labels, train_mask, train_results, tokenizer, args.n_clusters)
     dfa = extractor.get_dfa(name=lang_name + "-kmeans")
 
-# FIXME: DFA is correct for a*, but this evaluation is wrong.
-dev_acc = score_whole_words(dfa, dev_sents, dev_preds)
-print("Dev Acc", dev_acc)
-breakpoint()
+dev_gold = [bool(x) for x in dev_gold]
+dev_acc = score_whole_words(dfa, dev_sents, dev_gold)
+print(f"{lang_name} Acc", dev_acc)
