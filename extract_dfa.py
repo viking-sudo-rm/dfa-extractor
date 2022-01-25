@@ -35,8 +35,9 @@ def parse_args():
     parser.add_argument("--no_state_count", action="store_true")
     parser.add_argument("--table", action="store_true")
     parser.add_argument("--find_threshold", action="store_true")
+    parser.add_argument("--symmetric_merging", action="store_true")
+    parser.add_argument("--nondeterminism", action="store_true")
     return parser.parse_args()
-
 
 def score_whole_words(dfa, dataset, labels):
     acc = 0
@@ -64,13 +65,13 @@ def score_all_prefixes(dfa, dataset, labels):
             count += 1
     return (acc / count * 100)
 
-def build_dfa_from_dict(id, dict, labels):
+def build_dfa_from_dict(id, dict, labels, nfa=False):
     t = Trie(dict, labels)
-    my_dfa = Dfa(id, t.states, t.arcs)
+    my_dfa = Dfa(id, t.states, t.arcs, nfa=nfa)
     # states are represented in a dfs fashion
     return my_dfa
 
-def cosine_merging(dfa, states, states_mask, threshold):
+def cosine_merging(dfa, states, states_mask, threshold, symmetric=False):
     cos = torch.nn.CosineSimilarity(dim=-1)
     sim = cos(states[None, :, :], states[:, None, :])
     # sim1 = cos(states[None, states_mask, :], states[states_mask, None, :])
@@ -86,21 +87,21 @@ def cosine_merging(dfa, states, states_mask, threshold):
             # if (states_mask[i] and sim1[i, j] > threshold) or (not states_mask[i] and sim0[i, j] > threshold):
             if (sim[i, j] > threshold):
                 total += 1
-                res = dfa.merge_states(i, j)
+                res = dfa.merge_states(i, j, symmetric)
                 pruned += 1 - res
     dfa.id = str(dfa.id) + 'min'
     # print("Found", total, "different pairs of states to be equivalent.", "Pruned", pruned)
 
     return dfa
 
-def cross_validate(left, right, dfa, states, states_mask, val_sents, val_gold):
+def cross_validate(left, right, dfa, states, states_mask, val_sents, val_gold, symmetric=False):
 
     max_acc = -1.
     # we run merging multiple times, and select the best
     for j in np.arange(left, right, .005):
         # cur_threshold = (left + right) / 2
         _dfa = deepcopy(dfa)
-        merge_dfa = cosine_merging(_dfa, states, states_mask, j)
+        merge_dfa = cosine_merging(_dfa, states, states_mask, j, symmetric)
         cur_acc = score_all_prefixes(merge_dfa, val_sents, val_gold)
         if (cur_acc > max_acc):
             max_acc = cur_acc
@@ -162,7 +163,7 @@ if __name__ == "__main__":
                 raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
             # Define the maximal dfa-trie
-            redundant_dfa = build_dfa_from_dict(id=args.lang+str(args.sim_threshold), dict=train_sents, labels=train_gold) # build the trie based on train_gold
+            redundant_dfa = build_dfa_from_dict(id=args.lang+str(args.sim_threshold), dict=train_sents, labels=train_gold, nfa=args.nondeterminism) # build the trie based on train_gold
             assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.) # 100% initial accuracy
 
             # Obtain representations
@@ -183,7 +184,7 @@ if __name__ == "__main__":
                 # print(opt_thr, max_dev_acc)
             else:
                 # Merge states based on fixed similarity threshold
-                merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold)
+                merge_dfa = cosine_merging(redundant_dfa, states, states_mask, threshold=args.sim_threshold, symmetric=args.symmetric_merging)
 
             if (args.min):
                 merge_pdfa = to_pythomata_dfa(merge_dfa)
@@ -191,7 +192,7 @@ if __name__ == "__main__":
                 min_pdfa = min_pdfa.minimize().trim()
                 min_dfa = from_pythomata_dfa(min_pdfa)
                 merge_dfa = min_dfa
-                print(args.lang, len(list(merge_dfa.table.keys())))
+                # print(args.lang, len(list(merge_dfa.table.keys())))
 
             if (args.fst):
                 init_dfa.make_graph()
@@ -225,6 +226,6 @@ if __name__ == "__main__":
 
     # Create plot for accuracy vs #data
     if (args.find_threshold):
-        create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, 'val-opt', args.epoch, args.eval)
+        create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, 'val-opt', args.epoch, args.eval, symmetric=args.symmetric_merging, nfa=args.nondeterminism)
     else:
-        create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval)
+        create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_train, args.lang, args.sim_threshold, args.epoch, args.eval, symmetric=args.symmetric_merging, nfa=args.nondeterminism)

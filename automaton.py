@@ -7,7 +7,7 @@ class Dfa:
     A basic class that represents a deterministic finite automaton.
     """
 
-    def __init__(self, id = 0, states = [], arcs = [], init_state=0):
+    def __init__(self, id = 0, states = [], arcs = [], init_state=0, nfa=False):
         """
         Expects an identifier (used for figure creation), a list of states in the
         form of tuples (n, is_final_state), and a list of tuples (state1, symbols, state2)
@@ -18,6 +18,7 @@ class Dfa:
         self.final = {}
         self.init_state = init_state
         self.id = id
+        self.nfa = nfa
         for v in states:
             self.table[v[0]] = []
             self.final[v[0]] = v[1]
@@ -45,20 +46,31 @@ class Dfa:
         Determines whether the automaton accepts or not a string.
         """
 
-        cur_state = self.init_state
-        for s in string:
-            found = False
-            for arcs in self.table[cur_state]:
-                if (arcs[0] == s):
-                    cur_state = arcs[1]
-                    found = True
-            if (not found):
-                return False
-        return self.final[cur_state]
-        # if (self.final[cur_state]):
-        #     return "FSA accepts"
-        # else:
-        #     return "FSA rejects"
+        if (not self.nfa):
+            cur_state = self.init_state
+            for s in string:
+                found = False
+                for arcs in self.table[cur_state]:
+                    if (arcs[0] == s):
+                        cur_state = arcs[1]
+                        found = True
+                if (not found):
+                    return False
+            return self.final[cur_state]
+        else:
+            prev_states = [self.init_state]
+            for s in string:
+                found = False
+                cur_states = []
+                for prev in prev_states:
+                    for arcs in self.table[prev]:
+                        if (arcs[0] == s):
+                            cur_states.append(arcs[1])
+                            break
+                if (len(cur_states) == 0):
+                    return False
+                prev_states = cur_states
+            return any([self.final[_cur] for _cur in prev_states])
 
     def return_states(self, string):
         states = [0] * (len(string) + 1)
@@ -74,7 +86,7 @@ class Dfa:
             states[i+1] = cur_state
         return states
 
-    def merge_states(self, state1, state2):
+    def merge_states(self, state1, state2, symmetric=False):
         """
         Merges state1 and state2.
         """
@@ -82,6 +94,11 @@ class Dfa:
         if (state1 not in self.table.keys() or state2 not in self.table.keys()):
             # already pruned state
             return 1
+
+        if (symmetric):
+            for arcs in self.table[state2]:
+                if (any([arcs[0] == x[0] for x in self.table[state1]])):
+                    return 1
 
         # if (self.final[state1] != self.final[state2]):
         #     # print("Trivially wrong. One state is final while the other is not.")
@@ -95,7 +112,7 @@ class Dfa:
 
         # find outgoing of the second state
         for arcs in self.table[state2]:
-            if (any([arcs[0] == x[0] for x in self.table[state1]])): # if there is a conflict, continue (we only keep state1's transition)
+            if (not self.nfa and any([arcs[0] == x[0] for x in self.table[state1]])): # if there is a conflict, continue (we only keep state1's transition)
                 continue
             # if (arcs[1] == state1): # we don't want to create self loops or do we?
             #     continue

@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, threshold, epoch, eval):
-
+def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, threshold, epoch, eval, symmetric=False, nfa=False):
 
     init_train_array = np.array(list(init_train_acc.values()))
     init_mean_train_acc = np.average(init_train_array, axis=0)
@@ -33,13 +32,13 @@ def create_plot(init_train_acc, init_dev_acc, train_acc, dev_acc, n_data, lang, 
     ax.set_ylabel("Accuracy")
     if (epoch == "best"):
         # Do not mention epoch in the title
-        title = f"{lang}, threshold = {str(threshold)}, eval = {eval}"
+        title = f"{lang}, threshold = {str(threshold)}, eval = {eval}, nfa = {nfa}"
     else:
-        title = f"{lang}, threshold = {str(threshold)}, {epoch}, eval = {eval}"
+        title = f"{lang}, threshold = {str(threshold)}, {epoch}, eval = {eval}, nfa = {nfa}"
     plt.title(title)
     plt.tight_layout()
     ax.legend()
-    plotname = f"./images/acc-{lang}-{str(threshold)}-{epoch}-{eval}.pdf"
+    plotname = f"./images_b4_ICML/acc-{lang}-{str(threshold)}-{epoch}-{eval}-{symmetric}-{nfa}.pdf"
     print(f"Saved {plotname}")
     plt.savefig(plotname)
     plt.show()
