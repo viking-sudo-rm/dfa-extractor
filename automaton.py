@@ -46,6 +46,7 @@ class Dfa:
         Determines whether the automaton accepts or not a string.
         """
 
+        # TODO: merge the two cases
         if (not self.nfa):
             cur_state = self.init_state
             for s in string:
@@ -64,9 +65,8 @@ class Dfa:
                 cur_states = []
                 for prev in prev_states:
                     for arcs in self.table[prev]:
-                        if (arcs[0] == s):
+                        if (arcs[0] == s and not (arcs[1] in cur_states)):
                             cur_states.append(arcs[1])
-                            break
                 if (len(cur_states) == 0):
                     return False
                 prev_states = cur_states
