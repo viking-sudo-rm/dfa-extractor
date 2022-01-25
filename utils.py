@@ -234,3 +234,7 @@ def get_norm(model: torch.nn.Module) -> torch.Tensor:
     """Get the 2-norm of the parameters in a model."""
     params = torch.cat([p.flatten() for p in model.parameters()])
     return params.norm(p=2)
+
+
+def get_device(args) -> str:
+    return torch.device(f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu')

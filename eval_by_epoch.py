@@ -10,7 +10,7 @@ import tqdm
 import random
 
 from languages import Language
-from utils import Tokenizer, get_data
+from utils import Tokenizer, get_data, get_device
 from models import Tagger
 from sampling import BalancedSampler, TestSampler
 from extract_dfa import build_dfa_from_dict, cosine_merging, score_all_prefixes, score_whole_words, cross_validate
@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--n_seeds", type=int, default=5)
     parser.add_argument("--len_train", type=int, default=10)
     parser.add_argument("--find_threshold", action="store_true")
+    parser.add_argument("--device", type=int, default=0)
     return parser.parse_args()
 
 
@@ -36,7 +37,7 @@ def set_seed(seed: int):
 
 
 def get_metrics(args, lang_name: str):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = get_device(args)
     lang = Language.from_string(lang_name.split("-")[0])  # Remove any clarifying suffixes
     lang_dir = os.path.join("models", lang_name)
     token_path = os.path.join(lang_dir, "tokenizer.pkl")
