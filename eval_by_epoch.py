@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--n_seeds", type=int, default=5)
     parser.add_argument("--len_train", type=int, default=10)
     parser.add_argument("--find_threshold", action="store_true")
+    parser.add_argument("--nondeterminism", action="store_true")
     return parser.parse_args()
 
 
@@ -42,7 +43,7 @@ def get_metrics(args, lang_name: str):
     token_path = os.path.join(lang_dir, "tokenizer.pkl")
     with open(token_path, "rb") as fh:
         tokenizer: Tokenizer = pickle.load(fh)
-    
+
     sampler = BalancedSampler(lang)
     dev_sampler = TestSampler(lang)
     ckpts = [s for s in os.listdir(lang_dir) if re.match(r"epoch[0-9]+\.th", s)]
@@ -84,7 +85,7 @@ def get_metrics(args, lang_name: str):
             else:
                 raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
-            redundant_dfa = build_dfa_from_dict(id=lang_name, dict=train_sents, labels=train_gold) # build the trie based on train_gold
+            redundant_dfa = build_dfa_from_dict(id=lang_name, dict=train_sents, labels=train_gold, nfa=args.nondeterminism) # build the trie based on train_gold
             assert(score_all_prefixes(redundant_dfa, train_sents, train_gold) == 100.)
             representations = train_results["states"]
             idx = [redundant_dfa.return_states(sent) for sent in train_sents]
@@ -158,6 +159,7 @@ def run_for_lang(args):
     if not os.path.isdir(by_epoch_dir):
         os.makedirs(by_epoch_dir)
 
+    plt.style.use('ggplot')
     for name, nice_name in nice_names.items():
         plt.figure()
         plt.xlabel("#epochs")
