@@ -5,11 +5,13 @@ import pickle
 import torch
 import numpy as np
 from collections import defaultdict
+import random
+import tqdm
 
 from sklearn.cluster import KMeans
 
 from languages import Language
-from pythomata_wrapper import to_pythomata_dfa
+from pythomata_wrapper import to_pythomata_dfa, to_pythomata_nfa
 from utils import Tokenizer, get_data
 from sampling import BalancedSampler, TestSampler
 from models import Tagger
@@ -17,8 +19,14 @@ from automaton import Dfa
 from extract_dfa import score_whole_words
 
 
+def set_seed(seed: int):
+    random.seed(seed)
+    torch.random.manual_seed(seed)
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--seeds", type=int, default=2)
     parser.add_argument("--lang", type=str, default="Tom1")
     parser.add_argument("--eval", choices=["preds", "labels"], default="preds")
     parser.add_argument("--n_train", type=int, default=200)
@@ -38,7 +46,7 @@ class KmeansExtractor:
 
     def _cluster(self):
         """Do KMeans to create a list of clustered states."""
-        self.raw_states = train_results["states"] * train_mask.unsqueeze(dim=-1)
+        self.raw_states = self.train_results["states"] * self.train_mask.unsqueeze(dim=-1)
         states = [state.numpy() for state in self.raw_states.flatten(end_dim=1) if not (state == 0).all()]
         self.kmeans = KMeans(n_clusters=self.n_clusters)
         clusters = self.kmeans.fit_predict(states)
@@ -88,49 +96,73 @@ class KmeansExtractor:
         return max(set(values), key=values.count)
 
 
-args = parse_args()
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-lang_name = args.lang
-lang = Language.from_string(lang_name.split("-")[0])  # Remove any clarifying suffixes
-lang_dir = os.path.join("models", lang_name)
-token_path = os.path.join(lang_dir, "tokenizer.pkl")
-with open(token_path, "rb") as fh:
-    tokenizer: Tokenizer = pickle.load(fh)
+def extract_dfa(args, lang_name: str):
+    lang = Language.from_string(lang_name.split("-")[0])  # Remove any clarifying suffixes
+    lang_dir = os.path.join("models", lang_name)
+    token_path = os.path.join(lang_dir, "tokenizer.pkl")
+    with open(token_path, "rb") as fh:
+        tokenizer: Tokenizer = pickle.load(fh)
 
-sampler = BalancedSampler(lang)
-dev_sampler = TestSampler(lang)
-train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.len_train)
-val_tokens, val_labels, val_mask, val_sents = get_data(sampler, lang, tokenizer, 20, 2 * args.len_train)
-dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
-dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))]
+    sampler = BalancedSampler(lang)
+    dev_sampler = TestSampler(lang)
+    train_tokens, train_labels, train_mask, train_sents = get_data(sampler, lang, tokenizer, args.n_train, args.len_train)
+    val_tokens, val_labels, val_mask, val_sents = get_data(sampler, lang, tokenizer, 20, 2 * args.len_train)
+    dev_tokens, _dev_labels, dev_mask, dev_sents = get_data(dev_sampler, lang, tokenizer, 1000, 50)
+    dev_labels = [_dev_labels[i][dev_mask[i]][-1] for i in range(len(_dev_labels))]
 
-path = os.path.join(lang_dir, "best.th")
-trained_model = Tagger(tokenizer.n_tokens, 10, 100)
-trained_model.load_state_dict(torch.load(path, map_location=device))
-with torch.no_grad():
-    train_results = trained_model(train_tokens, train_labels, train_mask)
-    val_results = trained_model(val_tokens, val_labels, val_mask)
-    dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
-train_preds = train_results["predictions"]
-val_preds = val_results["predictions"]
-_dev_preds = dev_results["predictions"]
-dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
+    path = os.path.join(lang_dir, "best.th")
+    trained_model = Tagger(tokenizer.n_tokens, 10, 100)
+    trained_model.load_state_dict(torch.load(path, map_location=device))
+    with torch.no_grad():
+        train_results = trained_model(train_tokens, train_labels, train_mask)
+        val_results = trained_model(val_tokens, val_labels, val_mask)
+        dev_results = trained_model(dev_tokens, _dev_labels, dev_mask)
+    train_preds = train_results["predictions"]
+    val_preds = val_results["predictions"]
+    _dev_preds = dev_results["predictions"]
+    dev_preds = [_dev_preds[i][dev_mask[i]][-1] for i in range(len(_dev_preds))] # valid for TestSampler
 
-if (args.eval == "preds"):
-    train_gold = train_preds
-    val_gold = val_preds
-    dev_gold = dev_preds
-elif (args.eval == "labels"):
-    train_gold = train_labels
-    val_gold = val_labels
-    dev_gold = dev_labels
-else:
-    raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
+    if (args.eval == "preds"):
+        train_gold = train_preds
+        # val_gold = val_preds
+        dev_gold = dev_preds
+    elif (args.eval == "labels"):
+        train_gold = train_labels
+        # val_gold = val_labels
+        dev_gold = dev_labels
+    else:
+        raise ValueError("Choose --eval between predictions `preds` and labels `labels`.")
 
-with torch.no_grad():
-    extractor = KmeansExtractor(train_tokens, train_labels, train_mask, train_results, tokenizer, args.n_clusters)
+    with torch.no_grad():
+        extractor = KmeansExtractor(train_tokens, train_gold, train_mask, train_results, tokenizer, args.n_clusters)
     dfa = extractor.get_dfa(name=lang_name + "-kmeans")
 
-dev_gold = [bool(x) for x in dev_gold]
-dev_acc = score_whole_words(dfa, dev_sents, dev_gold)
-print(f"{lang_name} Acc", dev_acc)
+    dev_gold = [bool(x) for x in dev_gold]
+    dev_acc = score_whole_words(dfa, dev_sents, dev_gold)
+    min_dfa = to_pythomata_dfa(dfa).minimize()
+    n_states = len(min_dfa.states)
+    return dfa, dev_acc, n_states
+
+
+def extract_dfas(args, lang):
+    dev_accs = []
+    all_n_states = []
+    for seed in tqdm.trange(args.seeds):
+        set_seed(seed)
+        _, dev_acc, n_states = extract_dfa(args, lang)
+        dev_accs.append(dev_acc)
+        all_n_states.append(n_states)
+    
+    print("=" * 3, lang, "=" * 3)
+    print("dev acc:", np.mean(dev_accs), "+-", np.std(dev_accs))
+    print("min n_states:", np.min(all_n_states))
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.lang is not None:
+        for lang in ["Tom1", "Tom2", "Tom3", "Tom4", "Tom5", "Tom6", "Tom7"]:
+            extract_dfas(args, lang)
+    else:
+        extract_dfas(args, args.lang)
